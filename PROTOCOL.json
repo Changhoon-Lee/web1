@@ -1,22 +1,43 @@
 {
-  "version": "23.1.1",
-  "primary_hypothesis": "STATIC_160_vs_V10_ALIGNED_COMMON_OOS",
-  "secondary_hypotheses": ["DYNAMIC_NO_TILT_vs_EQUAL_AVG_DYNAMIC_NO_TILT", "DYNAMIC_ONLINE_TILT_vs_DYNAMIC_NO_TILT"],
+  "version": "24.0.0",
+  "primary_hypothesis": "V10_100_PLUS_EQUITY_30_PLUS_GOLD_30_MINUS_CASH_60",
+  "baseline_name": "V10_ALIGNED_COMMON_OOS",
+  "baseline_not_name": "V10_FULL_HISTORY",
   "execution_delay": 2,
   "warmup_days": 756,
   "one_way_cost_bps": 17.0,
-  "financing_rate_default": 0.05,
-  "maximum_gross": 1.60,
-  "anchor_bounds": [0.20, 0.50],
-  "online_tilt_absolute_bound": 0.10,
-  "final_weight_bounds": [0.15, 0.55],
+  "borrow_spread_annual": 0.05,
+  "max_overlay": 0.60,
+  "static_equity_overlay": 0.30,
+  "static_gold_overlay": 0.30,
+  "online_split_bounds": [0.25, 0.75],
+  "overlay_states": [0.00, 0.15, 0.30, 0.45, 0.60],
+  "up_confirm_days": 10,
   "correlation_floor": 0.75,
-  "leverage_states": [1.00, 1.15, 1.30, 1.45, 1.60],
-  "up_confirmation_days": 10,
+  "economic_gate": {
+    "cagr_advantage": 0.0,
+    "terminal_wealth_ratio": 1.05,
+    "sharpe_advantage": 0.10,
+    "mdd_improvement": 0.08,
+    "calmar_advantage": 0.20,
+    "cvar_improvement_fraction": 0.15,
+    "liquidations": 0
+  },
   "bootstrap_blocks": [30, 60, 120],
-  "bootstrap_samples": 20000,
+  "bootstrap_samples": 10000,
   "hac_lags": [20, 60, 120],
   "minimum_tests": 44,
-  "authority": ["44_tests", "exact_integer_ledgers", "economic_invariants", "output_manifest"],
-  "forbidden": ["post_result_parameter_grid_expansion", "future_data_in_policy", "promotion_to_live_ready", "using_equal_average_leverage_as_causal_evidence"]
+  "authority": [
+    "44_tests",
+    "exact_integer_ledgers",
+    "economic_invariants",
+    "output_manifest"
+  ],
+  "forbidden": [
+    "changing_primary_30_30_after_results",
+    "reducing_or_levering_v10_core",
+    "future_data_in_policy",
+    "promoting_historical_results_to_live_ready",
+    "mixing_full_history_v10_with_aligned_common_oos_v10"
+  ]
 }

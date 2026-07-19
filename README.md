@@ -1,77 +1,106 @@
-# V23.1 Final Pareto Audit Lab
+# V24 Portable Diversifier Overlay Lab
 
-단 하나의 입력 패널로 V10 정렬 기준선, 분산 anchor, 정적 1.60배, 동적 risk budget, bounded online tilt를 동일 비용·지연 규칙에서 비교하는 최종 감사 패키지입니다.
+V24는 기존 분산 anchor처럼 V10을 Equity·Gold로 **대체하지 않습니다**. 정렬된 V10 core를 항상 100% 유지하고, 그 위에 저상관 trend sleeve를 추가합니다.
 
-## 연구 가설
+## 사전등록 Primary
 
-1. 분산 anchor가 충분히 낮은 위험을 만들면 제한된 포트폴리오 레버리지로 V10의 절대수익을 회복할 수 있는가?
-2. 정적 1.60배가 역사적 Pareto 후보인가?
-3. 동적 risk controller가 동일 평균 레버리지 정적 통제보다 가치를 추가하는가?
-4. bounded online tilt가 no-tilt 동적 정책보다 가치를 추가하는가?
+```text
+V10 core       +100%
+Equity Trend    +30%
+Gold Trend      +30%
+Cash/Borrow     -60%
+Net exposure    100%
+Risky gross     160%
+```
+
+Primary 비중은 결과를 보고 고른 grid가 아닙니다. 허용된 추가 gross 60%를 두 diversifier에 동일 배분한 단일 고정 가설입니다.
+
+## Secondary
+
+- `DYNAMIC_NO_TILT_OVERLAY`: V10 100%는 고정하고 overlay 총량만 0/15/30/45/60% 상태에서 조절
+- `DYNAMIC_ONLINE_OVERLAY`: core와 overlay 총량 제약을 유지한 채 Equity/Gold split만 25~75% 범위에서 조절
+- 각 동적 정책은 동일 평균 overlay의 정적 50/50 control과 비교
+
+Secondary가 실패해도 primary 결과를 변경하지 않습니다.
 
 ## 입력
+
+일별 decimal return 파일이 필요합니다.
 
 ```csv
 date,GROWTH_CRYPTO,EQUITY_TREND,GOLD_TREND,V10,CASH
 2020-01-01,0.001,-0.002,0.0003,0.0011,0.00005
 ```
 
-`CASH`는 선택이며 없으면 0으로 처리합니다. 가격이나 퍼센트가 아니라 일별 소수 수익률이어야 합니다.
+필수 열: `date`, `GROWTH_CRYPTO`, `EQUITY_TREND`, `GOLD_TREND`, `V10`
 
-자동 탐색 순서:
+`CASH`는 선택 사항이며 없으면 0으로 처리합니다. 값 `0.01`은 하루 1% 수익입니다. 가격이나 `1` 단위의 퍼센트를 넣지 마십시오.
 
-1. `--input`
-2. `ENGINE_RETURNS_FILE`
-3. 현재 폴더, `~/Documents/ZCode/Autotrade`, `~/Downloads`의 `engine_returns.csv[.gz]`
-4. 해당 위치의 `V23*Handoff*.zip` 내부 engine returns
+`V10`은 반드시 기존 공식 엔진의 **동일 날짜 일별 수익**이어야 합니다. 보고서에서는 이를 `V10_ALIGNED_COMMON_OOS`라고 부르며 `V10_FULL_HISTORY`와 혼합하지 않습니다.
 
-## 실행
+## Mac 실행
+
+압축 해제 후 폴더에서:
 
 ```bash
 chmod +x *.command
+export ENGINE_RETURNS_FILE="/절대경로/engine_returns.csv.gz"
 ./RUN_EVERYTHING.command
 ```
 
-공식 bootstrap은 비교별·block별 20,000회입니다. 진단 실행만 줄일 수 있습니다.
+환경변수를 생략하면 현재 폴더, `~/Downloads`, `~/Documents/ZCode/Autotrade` 아래에서 입력 파일을 자동 탐색합니다.
+
+테스트만:
 
 ```bash
-V23_BOOTSTRAP_SAMPLES=1000 ./02_RUN_FULL.command
+./01_RUN_TESTS.command
 ```
 
-## 권위 구현
+전체 연구만:
 
-- `src/v23_core.py`: 최초 완성 코어, 감사 가능한 원본
-- `src/v23_final_lab.py`: 권위 wrapper
-  - 실제 t+2 delayed position·turnover·financing으로 controller equity 갱신
-  - 모든 Mac 실행 명령을 handoff ZIP에 포함
+```bash
+./02_RUN_FULL.command
+```
 
-## 전략
+결과 재검증:
 
-- `V10_ALIGNED_COMMON_OOS`
-- `UNIFORM_1X`
-- `ANCHOR_1X`: 20/60/120일 최대 EWMA 변동성의 역수, 가중치 20~50%
-- `STATIC_130`, `STATIC_145`, `STATIC_160`
-- `DYNAMIC_NO_TILT`
-- `DYNAMIC_ONLINE_TILT`
-- 동적 정책별 동일 평균 레버리지 정적 진단
+```bash
+./VERIFY_RESULTS.command
+```
 
-## 인과성
+## 권위 규칙
 
-- close[t]까지 신호 계산
-- t+2부터 목표 적용
-- 온라인 update는 관측된 engine return만 사용
-- 미래 행 변경 시 과거 anchor·tilt·controller equity·leverage가 불변인 검사 포함
+- signal은 close[t]까지의 정보만 사용
+- 동적·online 목표는 t+2부터 적용
+- V10 core는 portable 정책에서 항상 정확히 1,000,000 ppm
+- risky gross는 최대 1,600,000 ppm
+- fast down / slow up overlay hysteresis
+- 실제 turnover와 cash+borrow spread 비용 포함
+- exact integer ledger와 결과 SHA-256 manifest 필수
+- 44 tests, 0 failed, 0 skipped가 아니면 공식 결과 금지
 
-## 출력
-
-`results/`에 전략별 일간 수익, 포지션, exact integer ledger, risk-capacity attribution, feasibility, bootstrap, HAC, DSR, fold, stress, baseline identity와 manifest를 생성합니다.
-
-최종 전달본:
+## 결과
 
 ```text
-runtime/V23_1_ZCode_Handoff.zip
+results/FINAL_REPORT.md
+results/FINAL_GATE.json
+results/FEASIBILITY_SCREEN.json
+results/strategy_summary.csv
+results/bootstrap_results.csv
+results/hac_results.csv
+results/DSR_RESULTS.json
+results/stress_tests.csv
+results/*_exact_ledger.csv.gz
+results/OUTPUT_MANIFEST.json
+runtime/V24_ZCode_Handoff.zip
 ```
 
 ## 판정 한계
 
-정적 1.60배가 모든 gate를 통과해도 반복 연구에 사용된 역사이므로 `HISTORICAL_STATIC_160_PARETO_PASS_NEEDS_NEW_OOS`까지만 허용합니다. 입력 engine returns의 생성·provenance와 외부 공식 V10 full-history ledger 동일성은 별도 원장으로 검증해야 합니다.
+역사적 경제·통계 gate를 모두 통과해도 최고 상태는:
+
+```text
+HISTORICAL_PORTABLE_OVERLAY_PARETO_PASS_NEEDS_NEW_OOS
+```
+
+입니다. 이 패키지는 live readiness를 주장하지 않으며, 외부 데이터 provenance와 공식 V10 full-history ledger 검증을 대신하지 않습니다.
