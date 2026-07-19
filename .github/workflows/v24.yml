@@ -1,14 +1,14 @@
-name: v24-verify
+name: v24-final-audit-verify
 
 on:
   push:
-    branches: ["v24-portable-overlay-final"]
+    branches: ["v24-final-audited-handoff"]
   pull_request:
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -17,7 +17,7 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt
-      - name: Run 44 regression tests
+      - name: Run complete regression suite
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: python -m unittest discover -s tests -p 'test_*.py' -v

@@ -14,7 +14,7 @@ python -m pip install -r requirements.txt
 ./02_RUN_FULL.command
 ./VERIFY_RESULTS.command
 
-printf '\nV24 completed. Final handoff:\n%s\n' "$(pwd)/runtime/V24_ZCode_Handoff.zip"
+printf '\nV24 final audit completed. Final handoff:\n%s\n' "$(pwd)/runtime/V24_Final_Audited_Handoff.zip"
 if command -v open >/dev/null 2>&1; then
   open "$(pwd)/runtime"
 fi

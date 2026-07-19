@@ -4,8 +4,8 @@ cd "$(dirname "$0")"
 source .venv/bin/activate
 export PYTHONPATH="$(pwd)/src${PYTHONPATH:+:$PYTHONPATH}"
 
-ARGS=(all --output results --handoff runtime/V24_ZCode_Handoff.zip)
+ARGS=(all --output results --handoff runtime/V24_Final_Audited_Handoff.zip)
 if [ -n "${ENGINE_RETURNS_FILE:-}" ]; then
   ARGS+=(--input "$ENGINE_RETURNS_FILE")
 fi
-python src/v24_cli.py "${ARGS[@]}"
+python src/v24_final_cli.py "${ARGS[@]}"
