@@ -1,10 +1,7 @@
 {
-  "version": "23.1.0",
+  "version": "23.1.1",
   "primary_hypothesis": "STATIC_160_vs_V10_ALIGNED_COMMON_OOS",
-  "secondary_hypotheses": [
-    "DYNAMIC_NO_TILT_vs_EQUAL_AVG_DYNAMIC_NO_TILT",
-    "DYNAMIC_ONLINE_TILT_vs_DYNAMIC_NO_TILT"
-  ],
+  "secondary_hypotheses": ["DYNAMIC_NO_TILT_vs_EQUAL_AVG_DYNAMIC_NO_TILT", "DYNAMIC_ONLINE_TILT_vs_DYNAMIC_NO_TILT"],
   "execution_delay": 2,
   "warmup_days": 756,
   "one_way_cost_bps": 17.0,
@@ -19,16 +16,7 @@
   "bootstrap_blocks": [30, 60, 120],
   "bootstrap_samples": 20000,
   "hac_lags": [20, 60, 120],
-  "authority": [
-    "42_tests",
-    "exact_integer_ledgers",
-    "economic_invariants",
-    "output_manifest"
-  ],
-  "forbidden": [
-    "post_result_parameter_grid_expansion",
-    "future_data_in_policy",
-    "promotion_to_live_ready",
-    "using_equal_average_leverage_as_causal_evidence"
-  ]
+  "minimum_tests": 44,
+  "authority": ["44_tests", "exact_integer_ledgers", "economic_invariants", "output_manifest"],
+  "forbidden": ["post_result_parameter_grid_expansion", "future_data_in_policy", "promotion_to_live_ready", "using_equal_average_leverage_as_causal_evidence"]
 }
