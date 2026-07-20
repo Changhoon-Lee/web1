@@ -16,39 +16,47 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install
+      - name: Install full CI dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-      - name: Run V27 tests
+          python -m pip install -r requirements-v27.txt
+      - name: Run authoritative V27 and free-only tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           export PYTHONHASHSEED=0
           export OMP_NUM_THREADS=1
           export OPENBLAS_NUM_THREADS=1
           export MKL_NUM_THREADS=1
           export NUMEXPR_NUM_THREADS=1
-          python -m unittest discover -s tests -p 'test_v27*.py' -v
+          python -m unittest tests.test_v27 -v
+          python -m unittest tests.test_v27_free_open -v
       - name: Free-only fail-closed smoke
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           rm -rf data/v27_free_chain v27_free_results runtime
           mkdir -p data/v27_free_chain
           python src/v27_free_open.py all --data data/v27_free_chain --output v27_free_results --handoff runtime/V27_Free_Open_Data_Only_Handoff.zip --no-record
           python src/v27_free_verify.py --output v27_free_results
           test -f runtime/V27_Free_Open_Data_Only_Handoff.zip
-      - name: Stage verified source
+      - name: Stage sanitized free-only source
         run: |
           rm -rf artifact_stage
-          mkdir artifact_stage
-          rsync -a ./ artifact_stage/ \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude '.venv' \
-            --exclude '__pycache__' \
-            --exclude '*.pyc' \
-            --exclude 'artifact_stage' \
-            --exclude 'data/v27_free_chain/*' \
-            --exclude 'v27_free_results' \
-            --exclude 'runtime'
+          mkdir -p artifact_stage/src artifact_stage/tests
+          cp requirements.txt artifact_stage/
+          cp src/v27_core.py artifact_stage/src/
+          cp src/v27_core_legacy.py artifact_stage/src/
+          cp src/v27_free_open.py artifact_stage/src/
+          cp src/v27_free_verify.py artifact_stage/src/
+          cp src/v27_cli_free.py artifact_stage/src/v27_cli.py
+          cp tests/test_v27_free_open.py artifact_stage/tests/
+          cp RUN_V27_FREE_ONLY.command artifact_stage/
+          cp V27_FREE_RECORD.command artifact_stage/
+          cp V27_FREE_RECORD_CONTINUOUS.command artifact_stage/
+          cp V27_FREE_AUDIT.command artifact_stage/
+          cp V27_FREE_ONLY_PROTOCOL.json artifact_stage/
+          cp V27_FREE_OPEN_DATA_ONLY_README.md artifact_stage/
           python - <<'PY'
           from pathlib import Path
           import hashlib, json
@@ -59,9 +67,24 @@ jobs:
                   rows.append({'path':str(p.relative_to(root)), 'size':p.stat().st_size, 'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
           payload=json.dumps(rows,sort_keys=True,separators=(',',':')).encode()
           (root/'RELEASE_INFO.json').write_text(json.dumps({'protocol':'27.1.0-free-open','commit':'${{ github.sha }}','files':rows,'tree_sha256':hashlib.sha256(payload).hexdigest()},indent=2)+'\n')
+          forbidden=['tardis_dev','TARDIS_API_KEY=','DERIBIT_CLIENT_SECRET=','DERIBIT_CLIENT_ID=']
+          text='\n'.join(p.read_text(errors='ignore') for p in root.rglob('*') if p.is_file() and p.suffix in {'.py','.md','.json','.command','.txt'})
+          for token in forbidden:
+              if token in text:
+                  raise SystemExit(f'forbidden paid/private runtime token: {token}')
           PY
+      - name: Test sanitized artifact in clean tree
+        run: |
+          cd artifact_stage
+          export PYTHONPATH="$PWD/src"
+          python -m unittest tests.test_v27_free_open -v
+          rm -rf data/v27_free_chain v27_free_results runtime
+          mkdir -p data/v27_free_chain
+          python src/v27_free_open.py all --data data/v27_free_chain --output v27_free_results --handoff runtime/V27_Free_Open_Data_Only_Handoff.zip --no-record
+          python src/v27_free_verify.py --output v27_free_results
       - name: Build deterministic source zip
         run: |
+          rm -rf artifact_stage/data artifact_stage/v27_free_results artifact_stage/runtime artifact_stage/__pycache__ artifact_stage/src/__pycache__ artifact_stage/tests/__pycache__
           python - <<'PY'
           from pathlib import Path
           import zipfile
