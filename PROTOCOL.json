@@ -1,0 +1,42 @@
+{
+  "protocol": "27.1.0",
+  "title": "Open-Free Deribit Long-Variance Falsification Lab",
+  "frozen_hypothesis": "BTC 30-day implied variance and a synthetic ATM straddle may reveal whether long gamma is economically feasible using only free public data.",
+  "data_sources": [
+    "Deribit public/get_volatility_index_data",
+    "Deribit public/get_index_chart_data",
+    "Deribit public/get_historical_volatility",
+    "Deribit public/get_instruments",
+    "Deribit public/get_book_summary_by_instrument",
+    "Deribit public ticker and volatility-index WebSocket channels"
+  ],
+  "paid_sources_allowed": false,
+  "private_endpoints_allowed": false,
+  "historical_option_chain_imputation_allowed": false,
+  "primary": {
+    "horizon_days": 30,
+    "target_dte_days": 30,
+    "roll_days": 7,
+    "premium_budget": 0.05,
+    "delta_band": 0.10,
+    "option_half_spread": 0.025,
+    "hedge_cost_bps": 7.0
+  },
+  "stress": {
+    "cost_multipliers": [2, 3],
+    "unhedged_control": true
+  },
+  "hard_limits": {
+    "minimum_calendar_days": 365,
+    "minimum_monthly_anchors": 12,
+    "deployment_status": "BLOCKED_NO_HISTORICAL_OPTION_BID_ASK_CHAIN"
+  },
+  "prohibited": [
+    "Tardis or any paid archive",
+    "private Deribit endpoints",
+    "API keys",
+    "historical bid/ask interpolation",
+    "promoting model prices as historical executions",
+    "post-result parameter tuning"
+  ]
+}
