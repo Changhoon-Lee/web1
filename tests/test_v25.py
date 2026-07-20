@@ -25,7 +25,7 @@ class V25Tests(unittest.TestCase):
         crisis[720:728] = -0.055
         crisis[900:904] = -0.075
         v10 = common + crisis
-        hedge = 0.00035 - 0.55 * common - 0.70 * crisis + rng.normal(0, 0.003, len(idx))
+        hedge = 0.00080 - 0.55 * common - 0.70 * crisis + rng.normal(0, 0.003, len(idx))
         bad = 0.0001 + 0.50 * common + 0.20 * crisis + rng.normal(0, 0.004, len(idx))
         cash = np.full(len(idx), 0.03 / core.ANNUALIZATION)
         cls.data = pd.DataFrame({"V10": v10, "CASH": cash, "TAIL_HEDGE": hedge, "TAIL_BAD": bad}, index=idx)
@@ -144,6 +144,8 @@ class V25Tests(unittest.TestCase):
         source = core.run_core_derisk(self.data, self.cfg)
         control = core.run_equal_average_control(self.data, self.cfg, source, "CONTROL")
         self.assertTrue(np.allclose(control.weights.sum(axis=1), 1.0))
+        expected = abs(float(control.weights.iloc[0]["V10"]) - 1.0) + abs(float(control.weights.iloc[0]["TAIL_HEDGE"])) + abs(float(control.weights.iloc[0]["TAIL_BAD"]))
+        self.assertAlmostEqual(float(control.turnover.iloc[0]), expected)
 
     def test_21_bootstrap_deterministic(self):
         a = core.run_core_derisk(self.data, self.cfg)
