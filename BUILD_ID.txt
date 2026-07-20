@@ -1,3 +1,3 @@
-V24 Portable Diversifier Overlay Final Build
-Protocol 24.0.0
-Build date 2026-07-19
+V25 Dual Causal Defense Final Build
+Protocol 25.0.0
+Build date 2026-07-20

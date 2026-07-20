@@ -1,0 +1,59 @@
+{
+  "version": "25.0.0",
+  "name": "Dual Causal Defense",
+  "primary_hypotheses": [
+    "CORE_DERISK_ONLY_vs_V10_ALIGNED_COMMON_OOS",
+    "CORE_DERISK_PLUS_TAIL_vs_CORE_DERISK_ONLY",
+    "CORE_DERISK_PLUS_TAIL_vs_V10_ALIGNED_COMMON_OOS"
+  ],
+  "execution_delay": 2,
+  "core_states": [0.0, 0.25, 0.5, 0.75, 1.0],
+  "target_drawdown": 0.29,
+  "stress_horizon_days": 3,
+  "stress_loss_floor": 0.25,
+  "core_recovery_confirmation_days": 20,
+  "tail_engine_prefix": "TAIL_",
+  "tail_requalification": "monthly_expanding",
+  "tail_qualification": {
+    "v10_tail_quantile": 0.05,
+    "minimum_tail_observations": 30,
+    "tail_beta_max": 0.0,
+    "tail_mean_min": 0.0,
+    "worst20_mean_min": 0.0,
+    "cagr_min": 0.0,
+    "point_in_time_provenance_required": true
+  },
+  "capital_structure": {
+    "borrowing": false,
+    "net_exposure": 1.0,
+    "maximum_risky_gross": 1.0,
+    "tail_funding": "only_from_reduced_core"
+  },
+  "costs": {
+    "one_way_bps": 17.0,
+    "cash_return_column": "CASH"
+  },
+  "hard_gate_vs_v10": {
+    "cagr_advantage_min": 0.0,
+    "terminal_wealth_ratio_min": 1.05,
+    "sharpe_advantage_min": 0.10,
+    "mdd_improvement_min": 0.08,
+    "calmar_advantage_min": 0.20,
+    "cvar_improvement_min": 0.15,
+    "liquidations": 0
+  },
+  "interpretation_limits": [
+    "No future-return guarantee",
+    "Drawdown capacity applies only to the registered stress set",
+    "Execution delay can permit losses before a scheduled reduction",
+    "Tail engines without immutable point-in-time provenance are not official",
+    "Historical pass requires a new untouched OOS epoch"
+  ],
+  "authority": [
+    "81 regression tests",
+    "exact integer policy ledgers",
+    "future-row perturbation invariance",
+    "economic invariants",
+    "output SHA-256 manifest"
+  ]
+}
