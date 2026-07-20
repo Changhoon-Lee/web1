@@ -1,4 +1,0 @@
-V27 Deribit Long Gamma Final Build
-Protocol 27.0.0
-Frozen 2026-07-20
-Primary: 30D ATM straddle + causal delta hedge

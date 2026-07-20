@@ -1,43 +1,42 @@
 {
-  "version": "24.0.0",
-  "primary_hypothesis": "V10_100_PLUS_EQUITY_30_PLUS_GOLD_30_MINUS_CASH_60",
-  "baseline_name": "V10_ALIGNED_COMMON_OOS",
-  "baseline_not_name": "V10_FULL_HISTORY",
-  "execution_delay": 2,
-  "warmup_days": 756,
-  "one_way_cost_bps": 17.0,
-  "borrow_spread_annual": 0.05,
-  "max_overlay": 0.60,
-  "static_equity_overlay": 0.30,
-  "static_gold_overlay": 0.30,
-  "online_split_bounds": [0.25, 0.75],
-  "overlay_states": [0.00, 0.15, 0.30, 0.45, 0.60],
-  "up_confirm_days": 10,
-  "correlation_floor": 0.75,
-  "economic_gate": {
-    "cagr_advantage": 0.0,
-    "terminal_wealth_ratio": 1.05,
-    "sharpe_advantage": 0.10,
-    "mdd_improvement": 0.08,
-    "calmar_advantage": 0.20,
-    "cvar_improvement_fraction": 0.15,
-    "liquidations": 0
-  },
-  "bootstrap_blocks": [30, 60, 120],
-  "bootstrap_samples": 10000,
-  "hac_lags": [20, 60, 120],
-  "minimum_tests": 44,
-  "authority": [
-    "44_tests",
-    "exact_integer_ledgers",
-    "economic_invariants",
-    "output_manifest"
+  "protocol": "27.1.0",
+  "title": "Open-Free Deribit Long-Variance Falsification Lab",
+  "frozen_hypothesis": "BTC 30-day implied variance and a synthetic ATM straddle may reveal whether long gamma is economically feasible using only free public data.",
+  "data_sources": [
+    "Deribit public/get_volatility_index_data",
+    "Deribit public/get_index_chart_data",
+    "Deribit public/get_historical_volatility",
+    "Deribit public/get_instruments",
+    "Deribit public/get_book_summary_by_instrument",
+    "Deribit public ticker and volatility-index WebSocket channels"
   ],
-  "forbidden": [
-    "changing_primary_30_30_after_results",
-    "reducing_or_levering_v10_core",
-    "future_data_in_policy",
-    "promoting_historical_results_to_live_ready",
-    "mixing_full_history_v10_with_aligned_common_oos_v10"
+  "paid_sources_allowed": false,
+  "private_endpoints_allowed": false,
+  "historical_option_chain_imputation_allowed": false,
+  "primary": {
+    "horizon_days": 30,
+    "target_dte_days": 30,
+    "roll_days": 7,
+    "premium_budget": 0.05,
+    "delta_band": 0.10,
+    "option_half_spread": 0.025,
+    "hedge_cost_bps": 7.0
+  },
+  "stress": {
+    "cost_multipliers": [2, 3],
+    "unhedged_control": true
+  },
+  "hard_limits": {
+    "minimum_calendar_days": 365,
+    "minimum_monthly_anchors": 12,
+    "deployment_status": "BLOCKED_NO_HISTORICAL_OPTION_BID_ASK_CHAIN"
+  },
+  "prohibited": [
+    "Tardis or any paid archive",
+    "private Deribit endpoints",
+    "API keys",
+    "historical bid/ask interpolation",
+    "promoting model prices as historical executions",
+    "post-result parameter tuning"
   ]
 }

@@ -1,1 +1,1 @@
-"""V24 Portable Diversifier Overlay package."""
+"""V27.1 open/free Deribit research package."""
