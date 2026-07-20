@@ -1,0 +1,35 @@
+name: v27-deribit-long-gamma-verify
+
+on:
+  push:
+    branches: ["v27-deribit-long-gamma-final"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r requirements-v27.txt
+      - name: Run V27 regression suite
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: python -m unittest tests.test_v27 -v
+      - name: Stage verified V27 source handoff
+        run: |
+          mkdir -p artifact/V27_Deribit_Long_Gamma
+          rsync -a --exclude='.git' --exclude='.venv' --exclude='__pycache__' --exclude='.pytest_cache' --exclude='v24_results' --exclude='v25_results' --exclude='v27_results' --exclude='runtime' --exclude='data' ./ artifact/V27_Deribit_Long_Gamma/
+      - name: Upload single verified V27 ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: V27_Deribit_Long_Gamma_Final
+          path: artifact/V27_Deribit_Long_Gamma
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
