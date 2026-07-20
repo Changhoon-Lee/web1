@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "V25 Tail Engine Provenance",
+  "type": "object",
+  "required": ["engines"],
+  "properties": {
+    "engines": {
+      "type": "object",
+      "patternProperties": {
+        "^TAIL_[A-Z0-9_]+$": {
+          "type": "object",
+          "required": ["tradable", "point_in_time", "source_sha256", "retrieved_at", "cost_model"],
+          "properties": {
+            "tradable": {"const": true},
+            "point_in_time": {"const": true},
+            "source_sha256": {"type": "string", "minLength": 16},
+            "retrieved_at": {"type": "string", "minLength": 10},
+            "cost_model": {"type": "string", "minLength": 3},
+            "source_url": {"type": "string"},
+            "instrument": {"type": "string"},
+            "notes": {"type": "string"}
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

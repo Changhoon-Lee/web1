@@ -1,0 +1,35 @@
+name: v24-final-audit-verify
+
+on:
+  push:
+    branches: ["v24-final-audited-handoff"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r requirements.txt
+      - name: Run complete regression suite
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Stage verified source handoff
+        run: |
+          mkdir -p /tmp/V24_Final_Audited_Handoff
+          tar --exclude=.git --exclude=.venv --exclude=results --exclude=runtime --exclude='__pycache__' --exclude='*.pyc' -cf - . | tar -xf - -C /tmp/V24_Final_Audited_Handoff
+      - name: Upload single verified ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: V24_Final_Audited_Handoff
+          path: /tmp/V24_Final_Audited_Handoff
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30

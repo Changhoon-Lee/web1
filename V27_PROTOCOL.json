@@ -1,0 +1,60 @@
+{
+  "protocol": "V27_DERIBIT_LONG_GAMMA",
+  "version": "27.0.0",
+  "frozen_at": "2026-07-20",
+  "primary": {
+    "underlying": "BTC",
+    "instrument": "Deribit ATM call plus ATM put with identical strike and expiry",
+    "target_dte": 30,
+    "minimum_dte": 21,
+    "maximum_dte": 45,
+    "exit_dte": 7,
+    "roll_days": 7,
+    "premium_budget_fraction": 0.05,
+    "snapshot_minutes": 30,
+    "delta_band_per_contract": 0.10,
+    "maximum_hedge_minutes": 30,
+    "hedge_latency_bars": 1,
+    "entry_execution": "best ask",
+    "exit_execution": "best bid",
+    "option_fee": "min(0.03% underlying, 12.5% premium)",
+    "perpetual_cost_bps": 6,
+    "funding_annual_assumption": 0.03
+  },
+  "fixed_diagnostics": [
+    "unhedged_straddle",
+    "cost_2x",
+    "cost_3x",
+    "latency_2_bars",
+    "latency_3_bars"
+  ],
+  "data_gates": {
+    "minimum_backtest_days": 90,
+    "minimum_rolls": 8,
+    "minimum_active_day_ratio": 0.80,
+    "maximum_gap_hours": 48,
+    "executable_bid_ask_required": true,
+    "sparse_monthly_samples_cannot_pass": true
+  },
+  "economic_gates": {
+    "primary_final_wealth_above_one": true,
+    "primary_cagr_positive": true,
+    "cost_2x_final_wealth_above_one": true,
+    "cost_3x_final_wealth_above_one": true,
+    "latency_2_final_wealth_above_one": true,
+    "latency_3_final_wealth_above_one": true,
+    "top_5pct_positive_day_concentration_max": 0.50,
+    "liquidations": 0
+  },
+  "allowed_final_states": [
+    "INSUFFICIENT_CONTIGUOUS_OPTIONS_DATA",
+    "HISTORICAL_DERIBIT_LONG_GAMMA_REJECTED",
+    "HISTORICAL_DERIBIT_LONG_GAMMA_PASS_NEEDS_NEW_OOS"
+  ],
+  "forbidden_claims": [
+    "future profit guarantee",
+    "global impossibility of all option strategies",
+    "economic conclusion from sparse monthly samples",
+    "mark price treated as executable entry or exit"
+  ]
+}

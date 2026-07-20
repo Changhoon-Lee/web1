@@ -1,0 +1,38 @@
+{
+  "protocol": "V27_FREE_OPEN_DATA_ONLY",
+  "version": "27.1.0-free-open",
+  "permitted_sources": [
+    "Deribit public JSON-RPC API",
+    "Deribit public market data recorded prospectively"
+  ],
+  "forbidden": [
+    "paid historical data",
+    "private exchange credentials",
+    "historical bid/ask interpolation",
+    "mark price used as executable fill",
+    "current Greeks backfilled into the past",
+    "annualized performance from discontinuous samples"
+  ],
+  "data_gate": {
+    "minimum_active_days": 90,
+    "minimum_active_day_ratio": 0.8,
+    "maximum_gap_hours": 48,
+    "economic_metrics_before_gate": false
+  },
+  "primary_strategy": {
+    "instrument": "BTC ATM call plus put",
+    "target_dte": 30,
+    "allowed_dte": [21, 45],
+    "premium_budget_fraction": 0.05,
+    "roll_days": 7,
+    "delta_band_per_contract": 0.1,
+    "hedge_clock_minutes": 30,
+    "execution_latency_bars": 1
+  },
+  "terminal_statuses": [
+    "FREE_OPEN_DATA_CONTINUITY_NOT_READY",
+    "INSUFFICIENT_CONTIGUOUS_OPTIONS_DATA",
+    "HISTORICAL_DERIBIT_LONG_GAMMA_REJECTED",
+    "HISTORICAL_DERIBIT_LONG_GAMMA_PASS_NEEDS_NEW_OOS"
+  ]
+}
