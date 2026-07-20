@@ -50,6 +50,7 @@ jobs:
           cp src/v27_free_open.py artifact_stage/src/
           cp src/v27_free_verify.py artifact_stage/src/
           cp src/v27_cli_free.py artifact_stage/src/v27_cli.py
+          sed -i 's/from v27_cli import build_handoff, coverage_summary, run_lab, verify_results/from v27_cli import run_lab, verify_results/' artifact_stage/src/v27_free_open.py
           cp tests/test_v27_free_open.py artifact_stage/tests/
           cp RUN_V27_FREE_ONLY.command artifact_stage/
           cp V27_FREE_RECORD.command artifact_stage/
