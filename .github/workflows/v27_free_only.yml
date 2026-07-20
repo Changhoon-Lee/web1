@@ -1,8 +1,10 @@
 name: V27 Free Open Data Only
 
 on:
+  push:
+    branches: [v27-free-open-data-only]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
