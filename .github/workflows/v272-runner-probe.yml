@@ -1,0 +1,108 @@
+name: V27.2 Runner Probe
+
+on:
+  push:
+    branches: [v272-inverse-accounting]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -q -r requirements-v272.txt
+      - name: generate-runner-result
+        continue-on-error: true
+        run: python scripts/run_v272_authority_tests.py
+      - name: probe-01
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_01_config_validates' in f)"
+      - name: probe-02
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_02_inverse_contract_pnl_identity' in f)"
+      - name: probe-03
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_03_inverse_short_profit_on_price_fall' in f)"
+      - name: probe-04
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_04_funding_sign' in f)"
+      - name: probe-05
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_05_canonicalization_preserves_perpetual' in f)"
+      - name: probe-06
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_06_free_snapshot_contains_actual_perpetual_fields' in f)"
+      - name: probe-07
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_07_per_timestamp_symbol_count' in f)"
+      - name: probe-08
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_08_paid_credentials_rejected' in f)"
+      - name: probe-09
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_09_perpetual_bid_ask_changes_final_equity' in f)"
+      - name: probe-10
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_10_actual_funding_changes_final_equity' in f)"
+      - name: probe-11
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_11_missing_funding_fails_continuity' in f)"
+      - name: probe-12
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_12_held_state_writer' in f)"
+      - name: probe-13
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_13_held_quote_gap_fails_gate' in f)"
+      - name: probe-14
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_14_ledger_identity' in f)"
+      - name: probe-15
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_15_audit_suite_contains_actual_data_gates' in f)"
+      - name: probe-16
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_16_complete_utc_intraday_gate' in f)"
+      - name: probe-17
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_17_partial_day_excluded' in f)"
+      - name: probe-18
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_18_sparse_intraday_fails' in f)"
+      - name: probe-19
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_19_deterministic_gzip' in f)"
+      - name: probe-20
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_20_network_failure_never_fills' in f)"
+      - name: probe-21
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_21_fail_closed_has_no_ledgers' in f)"
+      - name: probe-22
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_22_ready_true_end_to_end' in f)"
+      - name: probe-23
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_23_future_snapshot_does_not_change_past_file' in f)"
+      - name: probe-24
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_24_manifest_hash_changes' in f)"
+      - name: probe-25
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272.V272Tests.test_25_public_methods_only' in f)"
+      - name: probe-26
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272_wrapper.V272WrapperTests.test_26_pretrade_initial_equity_is_authoritative_baseline' in f)"
+      - name: probe-27
+        continue-on-error: true
+        run: python -c "import json; f={x['test'] for x in json.load(open('V272_AUTHORITY_RESULTS.json'))['failures']}; raise SystemExit('tests.test_v272_wrapper.V272WrapperTests.test_27_report_renderer_accepts_structured_metrics' in f)"
