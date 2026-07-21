@@ -3,6 +3,8 @@ name: V27.2 Actual Inverse Free/Open
 on:
   push:
     branches: [v272-inverse-accounting]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 jobs:
