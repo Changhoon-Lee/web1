@@ -1,0 +1,57 @@
+{
+  "protocol": "V27.2_ACTUAL_DERIBIT_INVERSE_LONG_GAMMA",
+  "version": "27.2.1-inverse-actual",
+  "frozen_at": "2026-07-21",
+  "source": {
+    "exchange": "Deribit",
+    "authentication": "none",
+    "allowed_methods": ["public/get_index_price", "public/get_instruments", "public/ticker"],
+    "paid_or_private_paths": false,
+    "historical_interpolation": false
+  },
+  "primary": {
+    "options": "BTC inverse ATM call plus put, same strike and expiry",
+    "target_dte": 30,
+    "allowed_dte": [21, 45],
+    "roll_days": 7,
+    "exit_dte": 7,
+    "premium_budget_fraction": 0.05,
+    "option_entry": "best ask",
+    "option_exit": "best bid",
+    "hedge": "BTC-PERPETUAL inverse",
+    "contract_size_usd": 10,
+    "hedge_target": "-option_delta_btc * index_price",
+    "hedge_latency_bars": 1,
+    "delta_band_btc_per_contract": 0.10,
+    "maximum_hedge_minutes": 30,
+    "perpetual_entry": "buy ask / sell bid",
+    "perpetual_taker_fee": 0.0005,
+    "funding": "actual public funding_8h prorated by elapsed seconds",
+    "option_fee": "min(0.0003 BTC, 12.5% of premium) per contract",
+    "performance_baseline": "pre-trade initial equity row before option spread, fees, hedge costs, and funding"
+  },
+  "data_gates": {
+    "minimum_active_days": 90,
+    "minimum_intraday_density_p10": 0.80,
+    "maximum_median_gap_minutes": 10,
+    "maximum_operational_gap_minutes": 30,
+    "minimum_held_option_quote_coverage": 0.95,
+    "minimum_perpetual_quote_coverage": 0.95,
+    "minimum_actual_funding_coverage": 0.95,
+    "all_option_closes_require_executable_bid": true
+  },
+  "fixed_stress": ["unhedged", "cost_2x", "cost_3x", "latency_2", "latency_3"],
+  "verification": {
+    "authority_tests": 27,
+    "execution_model": "one fresh Python interpreter per authority test",
+    "clean_tree_reverification": true,
+    "deterministic_zip": true
+  },
+  "allowed_final_states": [
+    "FREE_OPEN_DATA_CONTINUITY_NOT_READY",
+    "INSUFFICIENT_CONTIGUOUS_OPTIONS_DATA",
+    "MARKET_DATA_CONTINUITY_GATE_FAILED",
+    "HISTORICAL_DERIBIT_LONG_GAMMA_REJECTED",
+    "HISTORICAL_DERIBIT_LONG_GAMMA_PASS_NEEDS_NEW_OOS"
+  ]
+}
