@@ -67,13 +67,13 @@ jobs:
           mkdir -p data/v272_free_chain
           python src/v272_cli.py all --data data/v272_free_chain --output v272_results --handoff runtime/V272_Actual_Inverse_Handoff.zip --no-record --record-minutes 0
           python src/v272_cli.py verify --output v272_results
-      - name: Build deterministic ZIP
+      - name: Build deterministic ZIP proof
         run: |
           rm -rf artifact_stage/data artifact_stage/v272_results artifact_stage/runtime artifact_stage/.venv artifact_stage/**/__pycache__ artifact_stage/V272_AUTHORITY_RESULTS.json
           python - <<'PY'
           from pathlib import Path
           import zipfile,hashlib
-          root=Path('artifact_stage'); out=Path('V272_Actual_Inverse_Free_Open_Final.zip')
+          root=Path('artifact_stage'); out=Path('V272_Actual_Inverse_Free_Open_Deterministic_Proof.zip')
           with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
               for p in sorted(root.rglob('*')):
                   if not p.is_file(): continue
@@ -82,11 +82,12 @@ jobs:
                   info.compress_type=zipfile.ZIP_DEFLATED
                   info.external_attr=(0o755 if p.suffix in {'.command','.sh','.py'} else 0o644)<<16
                   z.writestr(info,p.read_bytes())
-          print('sha256',hashlib.sha256(out.read_bytes()).hexdigest())
+          print('deterministic_proof_sha256',hashlib.sha256(out.read_bytes()).hexdigest())
           PY
       - uses: actions/upload-artifact@v4
         with:
           name: V272_Actual_Inverse_Free_Open_Final
-          path: V272_Actual_Inverse_Free_Open_Final.zip
+          path: artifact_stage/
           if-no-files-found: error
           retention-days: 90
+          compression-level: 9
