@@ -1,26 +1,34 @@
-# V27.2 Actual Inverse Long Gamma — Free/Open Only
+# V27.2.1 Actual Inverse Long Gamma — Free/Open Only
 
-V27.2 replaces the previous virtual linear hedge with actual Deribit
-`BTC-PERPETUAL` inverse-contract accounting.
+V27.2.1 replaces the previous virtual linear hedge with actual Deribit
+`BTC-PERPETUAL` inverse-contract accounting. It also inserts an authoritative
+pre-trade equity row, so option spread, option fees, hedge execution costs, and
+funding are included in every wealth, CAGR, Sharpe, and drawdown calculation.
 
 ## One command
 
 ```bash
-chmod +x RUN_V272_EVERYTHING.command V272_SAFE_LAUNCHER.sh
+chmod +x RUN_V272_EVERYTHING.command INSTALL_AND_START_V272.command V272_SAFE_LAUNCHER.sh
 ./RUN_V272_EVERYTHING.command
 ```
 
-The one-shot command installs dependencies, runs all authority tests, records
-one public snapshot, applies the continuity gate, verifies outputs, and builds:
+The one-shot command installs dependencies, runs 27 authority tests in isolated
+Python interpreters, records one public snapshot, applies the continuity gate,
+verifies outputs, and builds:
 
 ```text
 runtime/V272_Actual_Inverse_Handoff.zip
 ```
 
-## Continuous collection
+For persistent macOS collection and automatic verified daily audits after the
+data gate becomes ready:
 
-Install `V272_SAFE_LAUNCHER.sh` under a macOS LaunchAgent with `RunAtLoad=true`
-and `KeepAlive=true`; do not combine it with `StartInterval`.
+```bash
+./INSTALL_AND_START_V272.command
+```
+
+The installer creates a LaunchAgent with `RunAtLoad=true` and `KeepAlive=true`.
+It does not use `StartInterval`.
 
 Default persistent locations:
 
@@ -57,8 +65,8 @@ Target notional = −option delta in BTC × current index
 ```
 
 Perpetual changes execute at ask when buying and bid when selling, then pay the
-standard registered taker fee. Inverse option premiums and fees are calculated
-in BTC and converted to USD at the contemporaneous index.
+registered taker fee. Inverse option premiums and fees are calculated in BTC and
+converted to USD at the contemporaneous index.
 
 ## Fail-closed gates
 
@@ -79,8 +87,26 @@ The economic gate additionally requires:
 - no margin breach or liquidation;
 - cost 2×/3× and latency 2/3-bar stress survival.
 
+## Verification
+
+The 27 authority tests include:
+
+- inverse-contract P&L identities;
+- perpetual bid/ask sensitivity of final equity;
+- actual funding sensitivity of final equity;
+- held-option state and quote-continuity gates;
+- ready-true end-to-end economic execution;
+- nano-dollar ledger identity;
+- pre-trade initial-equity baseline;
+- structured-metric report generation;
+- deterministic input and output manifests.
+
+Every authority test runs in a fresh Python interpreter. The sanitized artifact
+is then tested again from its own clean directory before the deterministic ZIP
+is uploaded.
+
 ## Boundaries
 
-V27.2 evaluates one frozen ATM long-straddle plus inverse-perpetual delta hedge.
+V27.2.1 evaluates one frozen ATM long-straddle plus inverse-perpetual delta hedge.
 It does not guarantee future profit or claim that all options strategies are
 impossible. Any historical pass is capped at `NEEDS_NEW_OOS`.
