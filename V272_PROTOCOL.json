@@ -1,6 +1,6 @@
 {
   "protocol": "V27.2_ACTUAL_DERIBIT_INVERSE_LONG_GAMMA",
-  "version": "27.2.0-inverse-actual",
+  "version": "27.2.1-inverse-actual",
   "frozen_at": "2026-07-21",
   "source": {
     "exchange": "Deribit",
@@ -27,7 +27,8 @@
     "perpetual_entry": "buy ask / sell bid",
     "perpetual_taker_fee": 0.0005,
     "funding": "actual public funding_8h prorated by elapsed seconds",
-    "option_fee": "min(0.0003 BTC, 12.5% of premium) per contract"
+    "option_fee": "min(0.0003 BTC, 12.5% of premium) per contract",
+    "performance_baseline": "pre-trade initial equity row before option spread, fees, hedge costs, and funding"
   },
   "data_gates": {
     "minimum_active_days": 90,
@@ -40,6 +41,12 @@
     "all_option_closes_require_executable_bid": true
   },
   "fixed_stress": ["unhedged", "cost_2x", "cost_3x", "latency_2", "latency_3"],
+  "verification": {
+    "authority_tests": 27,
+    "execution_model": "one fresh Python interpreter per authority test",
+    "clean_tree_reverification": true,
+    "deterministic_zip": true
+  },
   "allowed_final_states": [
     "FREE_OPEN_DATA_CONTINUITY_NOT_READY",
     "INSUFFICIENT_CONTIGUOUS_OPTIONS_DATA",
