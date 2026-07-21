@@ -26,12 +26,25 @@ def save_result(output: Path, key: str, result: Any) -> None:
     write_json(output / f"{key}_metrics.json", {"name": result.name, "status": result.status, **result.metrics})
 
 
+def _markdown_cell(value: Any) -> str:
+    """Render scalar and structured metrics without ambiguous pd.isna arrays."""
+    if isinstance(value, (list, tuple, dict, set)):
+        payload = sorted(value) if isinstance(value, set) else value
+        return json.dumps(payload, default=json_default, ensure_ascii=False, sort_keys=isinstance(payload, dict))
+    missing = pd.isna(value)
+    if isinstance(missing, bool) and missing:
+        return ""
+    if isinstance(value, float):
+        return f"{value:.8g}"
+    return str(value)
+
+
 def manual_markdown(frame: pd.DataFrame) -> str:
     if frame.empty:
         return "_No rows._"
     values = [[str(c) for c in frame.columns]]
     for row in frame.itertuples(index=False, name=None):
-        values.append(["" if pd.isna(v) else f"{v:.8g}" if isinstance(v, float) else str(v) for v in row])
+        values.append([_markdown_cell(value) for value in row])
     widths = [max(len(row[i]) for row in values) for i in range(len(values[0]))]
     fmt = lambda row: "| " + " | ".join(row[i].ljust(widths[i]) for i in range(len(row))) + " |"
     return "\n".join([fmt(values[0]), "| " + " | ".join("-" * w for w in widths) + " |", *[fmt(row) for row in values[1:]]])
