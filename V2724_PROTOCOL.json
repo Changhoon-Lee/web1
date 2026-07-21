@@ -1,0 +1,70 @@
+{
+  "protocol": "V27_2_4_DERIBIT_PUBLIC_WEBSOCKET_AUTHORITY",
+  "version": "27.2.4-websocket-authority",
+  "frozen_at": "2026-07-21",
+  "transport": {
+    "url": "wss://www.deribit.com/ws/api/v2",
+    "authentication": "none",
+    "ticker_interval": "agg2",
+    "ticker_channels": "ticker.<instrument>.agg2",
+    "instrument_lifecycle_channel": "instrument.state.option.BTC",
+    "maximum_channels_per_subscribe_message": 500,
+    "rest_allowlist_continuous_mode": ["public/get_instruments"],
+    "rest_ticker_polling": false,
+    "raw_channels": false
+  },
+  "universe": {
+    "currency": "BTC",
+    "entry_dte": [21, 45],
+    "collection_dte": [7, 45],
+    "all_strikes": true,
+    "option_types": ["call", "put"],
+    "perpetual": "BTC-PERPETUAL"
+  },
+  "cutoff_semantics": {
+    "snapshot_interval_seconds": 300,
+    "cutoff": "UTC five-minute boundary",
+    "selection": "latest exchange timestamp less than or equal to cutoff",
+    "future_messages_excluded": true,
+    "reconnect_requires_full_rehydration": true,
+    "out_of_order_messages_ignored": true,
+    "duplicate_messages_idempotent": true
+  },
+  "snapshot_gates": {
+    "minimum_option_symbol_coverage": 0.99,
+    "minimum_option_quote_coverage": 0.99,
+    "minimum_option_delta_coverage": 0.99,
+    "minimum_perpetual_quote_coverage": 1.0,
+    "minimum_funding_coverage": 1.0,
+    "maximum_median_source_age_seconds": 5,
+    "maximum_p99_source_age_seconds": 30,
+    "maximum_source_age_seconds": 60,
+    "single_connection_epoch": true,
+    "all_rows_authority": true
+  },
+  "history_gates": {
+    "minimum_active_days": 90,
+    "minimum_active_day_ratio": 0.8,
+    "maximum_day_gap_hours": 48,
+    "minimum_complete_day_density_p10": 0.8,
+    "maximum_median_gap_minutes": 10,
+    "maximum_operational_gap_minutes": 30,
+    "minimum_snapshot_authority_ratio": 0.99
+  },
+  "accounting": {
+    "options": "actual bid/ask inverse option accounting",
+    "hedge": "BTC-PERPETUAL 10 USD inverse contracts",
+    "funding": "actual public funding_8h prorated by elapsed seconds",
+    "held_option_actual_delta_coverage": 0.99,
+    "black_scholes_delta_fallback_can_pass_authority_gate": false
+  },
+  "authority_clock": "first complete UTC day recorded by V27.2.4",
+  "previous_rest_data": "diagnostic control only",
+  "allowed_final_states": [
+    "FREE_OPEN_DATA_CONTINUITY_NOT_READY",
+    "INSUFFICIENT_CONTIGUOUS_OPTIONS_DATA",
+    "MARKET_DATA_CONTINUITY_GATE_FAILED",
+    "HISTORICAL_DERIBIT_LONG_GAMMA_REJECTED",
+    "HISTORICAL_DERIBIT_LONG_GAMMA_PASS_NEEDS_NEW_OOS"
+  ]
+}
