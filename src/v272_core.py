@@ -88,6 +88,10 @@ def run_long_gamma(
     hedge_enabled: bool = True,
     held_state_file: Path | None = None,
 ) -> BacktestResult:
+    # Legacy functions resolve VERSION from their own module globals. Keep the
+    # atomic held-state file on the same authoritative protocol version as the
+    # wrapper and release manifest.
+    _legacy.VERSION = VERSION
     raw = _legacy.run_long_gamma(data, cfg, name, cost_multiplier, latency_bars, hedge_enabled, held_state_file)
     return _prepend_initial_equity(raw, cfg)
 
