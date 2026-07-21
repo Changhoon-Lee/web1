@@ -1,0 +1,53 @@
+name: V27.2 Per-Test Diagnostics
+
+on:
+  push:
+    branches: [v272-inverse-accounting]
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - test_01_config_validates
+          - test_02_inverse_contract_pnl_identity
+          - test_03_inverse_short_profit_on_price_fall
+          - test_04_funding_sign
+          - test_05_canonicalization_preserves_perpetual
+          - test_06_free_snapshot_contains_actual_perpetual_fields
+          - test_07_per_timestamp_symbol_count
+          - test_08_paid_credentials_rejected
+          - test_09_perpetual_bid_ask_changes_final_equity
+          - test_10_actual_funding_changes_final_equity
+          - test_11_missing_funding_fails_continuity
+          - test_12_held_state_writer
+          - test_13_held_quote_gap_fails_gate
+          - test_14_ledger_identity
+          - test_15_audit_suite_contains_actual_data_gates
+          - test_16_complete_utc_intraday_gate
+          - test_17_partial_day_excluded
+          - test_18_sparse_intraday_fails
+          - test_19_deterministic_gzip
+          - test_20_network_failure_never_fills
+          - test_21_fail_closed_has_no_ledgers
+          - test_22_ready_true_end_to_end
+          - test_23_future_snapshot_does_not_change_past_file
+          - test_24_manifest_hash_changes
+          - test_25_public_methods_only
+    name: ${{ matrix.test }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -q -r requirements-v272.txt
+      - env:
+          PYTHONPATH: ${{ github.workspace }}/src
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        run: python -m unittest tests.test_v272.V272Tests.${{ matrix.test }} -v
