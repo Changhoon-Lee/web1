@@ -1,8 +1,8 @@
 name: V27.2 Authority Result Issue
 
 on:
-  push:
-    branches: [v272-inverse-accounting]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
