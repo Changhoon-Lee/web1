@@ -10,7 +10,7 @@ on:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       PYTHONPATH: ${{ github.workspace }}/src
       OMP_NUM_THREADS: '1'
@@ -97,3 +97,9 @@ jobs:
       - name: test_25_public_methods_only
         continue-on-error: true
         run: python -m unittest tests.test_v272.V272Tests.test_25_public_methods_only
+      - name: test_26_pretrade_initial_equity_is_authoritative_baseline
+        continue-on-error: true
+        run: python -m unittest tests.test_v272_wrapper.V272WrapperTests.test_26_pretrade_initial_equity_is_authoritative_baseline
+      - name: test_27_report_renderer_accepts_structured_metrics
+        continue-on-error: true
+        run: python -m unittest tests.test_v272_wrapper.V272WrapperTests.test_27_report_renderer_accepts_structured_metrics
