@@ -28,10 +28,21 @@ jobs:
         shell: bash
         run: |
           set +e
-          python -m unittest tests.test_v272 > /tmp/v272-tests.log 2>&1
-          status=$?
-          cat /tmp/v272-tests.log
-          exit $status
+          python -m unittest tests.test_v272 > v272-tests.log 2>&1
+          echo $? > v272-tests.status
+          cat v272-tests.log
+          exit 0
+      - name: Upload authority diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: V272_Authority_Test_Log
+          path: |
+            v272-tests.log
+            v272-tests.status
+          if-no-files-found: error
+      - name: Enforce authority test result
+        run: exit "$(cat v272-tests.status)"
       - name: Fail-closed smoke
         env:
           PYTHONPATH: ${{ github.workspace }}/src
