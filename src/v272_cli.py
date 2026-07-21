@@ -179,17 +179,24 @@ def run_all(project: Path, data_root: Path, output: Path, handoff: Path, do_reco
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="V27.2 actual inverse free/open runtime")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("record", "audit"):
-        p = sub.add_parser(name)
-        p.add_argument("--data", type=Path, default=Path("data/v272_free_chain"))
-    p = sub.add_parser("all")
-    p.add_argument("--data", type=Path, default=Path("data/v272_free_chain"))
-    p.add_argument("--output", type=Path, default=Path("v272_results"))
-    p.add_argument("--handoff", type=Path, default=Path("runtime/V272_Actual_Inverse_Handoff.zip"))
-    p.add_argument("--record", action=argparse.BooleanOptionalAction, default=True)
-    p = sub.add_parser("verify")
-    p.add_argument("--output", type=Path, default=Path("v272_results"))
-    parser.add_argument("--record-minutes", type=int, default=0)
+
+    record_parser = sub.add_parser("record")
+    record_parser.add_argument("--data", type=Path, default=Path("data/v272_free_chain"))
+    record_parser.add_argument("--record-minutes", type=int, default=0)
+
+    audit_parser = sub.add_parser("audit")
+    audit_parser.add_argument("--data", type=Path, default=Path("data/v272_free_chain"))
+    audit_parser.add_argument("--record-minutes", type=int, default=0)
+
+    all_parser = sub.add_parser("all")
+    all_parser.add_argument("--data", type=Path, default=Path("data/v272_free_chain"))
+    all_parser.add_argument("--output", type=Path, default=Path("v272_results"))
+    all_parser.add_argument("--handoff", type=Path, default=Path("runtime/V272_Actual_Inverse_Handoff.zip"))
+    all_parser.add_argument("--record", action=argparse.BooleanOptionalAction, default=True)
+    all_parser.add_argument("--record-minutes", type=int, default=0)
+
+    verify_parser = sub.add_parser("verify")
+    verify_parser.add_argument("--output", type=Path, default=Path("v272_results"))
     return parser.parse_args(argv)
 
 
