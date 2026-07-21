@@ -7,11 +7,6 @@ on:
     branches: [master]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
-
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -24,8 +19,6 @@ jobs:
       - name: Install
         run: python -m pip install -q -r requirements-v272.txt
       - name: Run 27 authority tests
-        id: authority
-        continue-on-error: true
         env:
           PYTHONPATH: ${{ github.workspace }}/src
           PYTHONHASHSEED: '0'
@@ -33,26 +26,6 @@ jobs:
           OPENBLAS_NUM_THREADS: '1'
           MKL_NUM_THREADS: '1'
         run: python scripts/run_v272_authority_tests.py
-      - name: Report authority result
-        if: always() && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          {
-            echo '### V27.2 isolated authority result'
-            echo '```json'
-            cat V272_AUTHORITY_RESULTS.json
-            echo '```'
-          } > authority-comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" --body-file authority-comment.md
-      - name: Enforce authority result
-        if: always()
-        run: |
-          python - <<'PY'
-          import json
-          result=json.load(open('V272_AUTHORITY_RESULTS.json'))
-          raise SystemExit(0 if not result['failures'] else 1)
-          PY
       - name: Fail-closed smoke
         env:
           PYTHONPATH: ${{ github.workspace }}/src
