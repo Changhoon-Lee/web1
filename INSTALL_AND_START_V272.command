@@ -5,8 +5,9 @@ V272_HOME="$HOME/Library/Application Support/V272Free"
 LOG_DIR="$HOME/Library/Logs/V272Free"
 PLIST="$HOME/Library/LaunchAgents/com.zcode.v272free.recorder.plist"
 mkdir -p "$V272_HOME/src" "$V272_HOME/tests" "$LOG_DIR" "$HOME/Library/LaunchAgents"
-cp src/v272_core.py src/v272_free.py src/v272_cli.py "$V272_HOME/src/"
+cp src/v272_core.py src/v272_core_legacy.py src/v272_free.py src/v272_cli.py "$V272_HOME/src/"
 cp tests/test_v272.py "$V272_HOME/tests/"
+[ -f tests/test_v272_wrapper.py ] && cp tests/test_v272_wrapper.py "$V272_HOME/tests/"
 cp requirements-v272.txt V272_SAFE_LAUNCHER.sh V272_PROTOCOL.json V272_README.md "$V272_HOME/"
 chmod +x "$V272_HOME/V272_SAFE_LAUNCHER.sh"
 python3 -m venv "$V272_HOME/.venv"
@@ -14,7 +15,7 @@ source "$V272_HOME/.venv/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -r "$V272_HOME/requirements-v272.txt"
 export PYTHONPATH="$V272_HOME/src"
-python -m unittest "$V272_HOME/tests/test_v272.py" -v
+python -m unittest discover -s "$V272_HOME/tests" -p 'test_v272*.py' -v
 cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
