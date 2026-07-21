@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""V27.2.1 authoritative wrapper over the inverse-accounting implementation.
+"""V27.2.4 authoritative wrapper over the inverse-accounting implementation.
 
-Adds a pre-trade initial-equity ledger row so option entry spread and fees are
-included in every wealth, CAGR, Sharpe, and drawdown calculation. All economic
-and continuity gates are then recomputed from that corrected ledger.
+The accounting engine is unchanged. This wrapper adds the pre-trade baseline
+and verifies that every live option leg used by the hedge has an actual
+exchange-provided delta in the point-in-time WebSocket snapshot.
 """
 from __future__ import annotations
 
+import math
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import pandas as pd
 
@@ -18,7 +19,7 @@ for _name in dir(_legacy):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_legacy, _name)
 
-VERSION = "27.2.1-inverse-actual"
+VERSION = "27.2.4-websocket-authority"
 
 _PERFORMANCE_KEYS = {
     "observations", "start", "end", "calendar_days", "final_equity",
@@ -31,6 +32,8 @@ def _status(metrics: dict[str, Any], cfg: Config) -> str:
     sufficient = metrics.get("calendar_days", 0.0) >= cfg.minimum_backtest_days and metrics.get("roll_count", 0) >= cfg.minimum_rolls
     continuity = (
         metrics.get("held_option_quote_coverage", 0.0) >= cfg.minimum_held_quote_coverage
+        and metrics.get("held_option_delta_coverage", 0.0) >= 0.99
+        and metrics.get("missing_delta_bar_count", 1) == 0
         and metrics.get("executable_close_coverage", 0.0) >= 1.0
         and metrics.get("perpetual_quote_coverage", 0.0) >= cfg.minimum_perp_quote_coverage
         and metrics.get("funding_coverage", 0.0) >= cfg.minimum_funding_coverage
@@ -79,6 +82,47 @@ def _prepend_initial_equity(result: BacktestResult, cfg: Config) -> BacktestResu
     return BacktestResult(result.name, ledger, result.trades, result.diagnostics, metrics, _status(metrics, cfg))
 
 
+def _held_delta_metrics(data: pd.DataFrame, ledger: pd.DataFrame) -> dict[str, Any]:
+    """Measure actual exchange delta availability for every live option leg.
+
+    No Black-Scholes fallback is accepted for this authority gate. The
+    accounting engine may calculate a diagnostic fallback, but the economic
+    result cannot pass unless the recorded point-in-time rows contain delta.
+    """
+    if ledger.empty:
+        return {"held_option_delta_coverage": 0.0, "missing_delta_bar_count": 0, "held_delta_required": 0, "held_delta_available": 0}
+    market = data.copy()
+    market["timestamp"] = pd.to_datetime(market["timestamp"], utc=True, errors="coerce")
+    market["symbol"] = market["symbol"].astype(str).str.upper()
+    market = market.sort_values(["timestamp", "symbol"]).drop_duplicates(["timestamp", "symbol"], keep="last")
+    lookup = {(row.timestamp, row.symbol): row.delta for row in market[["timestamp", "symbol", "delta"]].itertuples(index=False)}
+    required = 0
+    available = 0
+    missing_bars = 0
+    for row in ledger.itertuples(index=False):
+        timestamp = pd.Timestamp(getattr(row, "timestamp"))
+        symbols = [str(getattr(row, "call_symbol", "")).upper(), str(getattr(row, "put_symbol", "")).upper()]
+        symbols = [symbol for symbol in symbols if symbol]
+        if not symbols:
+            continue
+        bar_missing = False
+        for symbol in symbols:
+            required += 1
+            value = lookup.get((timestamp, symbol))
+            if value is not None and math.isfinite(float(value)):
+                available += 1
+            else:
+                bar_missing = True
+        if bar_missing:
+            missing_bars += 1
+    return {
+        "held_option_delta_coverage": available / required if required else 1.0,
+        "missing_delta_bar_count": missing_bars,
+        "held_delta_required": required,
+        "held_delta_available": available,
+    }
+
+
 def run_long_gamma(
     data: pd.DataFrame,
     cfg: Config,
@@ -88,12 +132,12 @@ def run_long_gamma(
     hedge_enabled: bool = True,
     held_state_file: Path | None = None,
 ) -> BacktestResult:
-    # Legacy functions resolve VERSION from their own module globals. Keep the
-    # atomic held-state file on the same authoritative protocol version as the
-    # wrapper and release manifest.
     _legacy.VERSION = VERSION
     raw = _legacy.run_long_gamma(data, cfg, name, cost_multiplier, latency_bars, hedge_enabled, held_state_file)
-    return _prepend_initial_equity(raw, cfg)
+    result = _prepend_initial_equity(raw, cfg)
+    metrics = dict(result.metrics)
+    metrics.update(_held_delta_metrics(data, result.ledger))
+    return BacktestResult(result.name, result.ledger, result.trades, result.diagnostics, metrics, _status(metrics, cfg))
 
 
 def audit_suite(data: pd.DataFrame, cfg: Config, held_state_file: Path | None = None) -> tuple[dict[str, BacktestResult], dict[str, Any]]:
@@ -109,6 +153,8 @@ def audit_suite(data: pd.DataFrame, cfg: Config, held_state_file: Path | None = 
     tests = {
         "sufficient_history": primary.status not in {"INSUFFICIENT_HISTORICAL_OPTIONS_DATA", "MARKET_DATA_CONTINUITY_GATE_FAILED"},
         "held_quote_coverage": primary.metrics.get("held_option_quote_coverage", 0.0) >= cfg.minimum_held_quote_coverage,
+        "held_delta_coverage": primary.metrics.get("held_option_delta_coverage", 0.0) >= 0.99,
+        "no_missing_delta_bars": primary.metrics.get("missing_delta_bar_count", 1) == 0,
         "all_closes_executable": primary.metrics.get("missing_close_bid_count", 1) == 0,
         "perpetual_quote_coverage": primary.metrics.get("perpetual_quote_coverage", 0.0) >= cfg.minimum_perp_quote_coverage,
         "actual_funding_coverage": primary.metrics.get("funding_coverage", 0.0) >= cfg.minimum_funding_coverage,
