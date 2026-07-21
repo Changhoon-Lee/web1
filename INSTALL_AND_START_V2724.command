@@ -31,7 +31,10 @@ fi
 # authority data remains in place and is not reset on reinstall.
 launchctl bootout "gui/$(id -u)" "$NEW_PLIST" 2>/dev/null || true
 
-cp src/v272_core.py src/v272_core_legacy.py src/v2724_ws.py src/v2724_cli.py "$V2724_HOME/src/"
+# v272_free.py and v272_cli.py are copied only so the frozen V27.2 accounting
+# regression tests can run. The LaunchAgent never executes them.
+cp src/v272_core.py src/v272_core_legacy.py src/v272_free.py src/v272_cli.py \
+  src/v2724_ws.py src/v2724_cli.py "$V2724_HOME/src/"
 cp tests/test_v272.py tests/test_v272_wrapper.py tests/test_v2724_ws.py "$V2724_HOME/tests/"
 cp scripts/run_v2724_authority_tests.py "$V2724_HOME/scripts/"
 cp requirements-v2724.txt V2724_PROTOCOL.json V2724_README.md V2724_SAFE_LAUNCHER.sh "$V2724_HOME/"
