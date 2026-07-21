@@ -18,31 +18,14 @@ jobs:
           python-version: '3.12'
       - name: Install
         run: python -m pip install -q -r requirements-v272.txt
-      - name: Run authority tests
+      - name: Run 27 authority tests
         env:
           PYTHONPATH: ${{ github.workspace }}/src
           PYTHONHASHSEED: '0'
           OMP_NUM_THREADS: '1'
           OPENBLAS_NUM_THREADS: '1'
           MKL_NUM_THREADS: '1'
-        shell: bash
-        run: |
-          set +e
-          python -m unittest tests.test_v272 > v272-tests.log 2>&1
-          echo $? > v272-tests.status
-          cat v272-tests.log
-          exit 0
-      - name: Upload authority diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: V272_Authority_Test_Log
-          path: |
-            v272-tests.log
-            v272-tests.status
-          if-no-files-found: error
-      - name: Enforce authority test result
-        run: exit "$(cat v272-tests.status)"
+        run: python -m unittest discover -s tests -p 'test_v272*.py' -v
       - name: Fail-closed smoke
         env:
           PYTHONPATH: ${{ github.workspace }}/src
@@ -55,8 +38,8 @@ jobs:
         run: |
           rm -rf artifact_stage
           mkdir -p artifact_stage/src artifact_stage/tests
-          cp src/v272_core.py src/v272_free.py src/v272_cli.py artifact_stage/src/
-          cp tests/test_v272.py artifact_stage/tests/
+          cp src/v272_core.py src/v272_core_legacy.py src/v272_free.py src/v272_cli.py artifact_stage/src/
+          cp tests/test_v272.py tests/test_v272_wrapper.py artifact_stage/tests/
           cp requirements-v272.txt V272_PROTOCOL.json V272_README.md artifact_stage/
           cp RUN_V272_EVERYTHING.command INSTALL_AND_START_V272.command V272_SAFE_LAUNCHER.sh artifact_stage/
           python - <<'PY'
@@ -68,7 +51,7 @@ jobs:
               if p.is_file():
                   files.append({'path':str(p.relative_to(root)), 'size':p.stat().st_size, 'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
           payload=json.dumps(files,sort_keys=True,separators=(',',':')).encode()
-          (root/'RELEASE_INFO.json').write_text(json.dumps({'protocol':'27.2.0-inverse-actual','commit':'${{ github.sha }}','files':files,'tree_sha256':hashlib.sha256(payload).hexdigest()},indent=2)+'\n')
+          (root/'RELEASE_INFO.json').write_text(json.dumps({'protocol':'27.2.1-inverse-actual','commit':'${{ github.sha }}','files':files,'tree_sha256':hashlib.sha256(payload).hexdigest()},indent=2)+'\n')
           forbidden=['tardis_dev','TARDIS_API_KEY=','DERIBIT_CLIENT_SECRET=','DERIBIT_CLIENT_ID=']
           text='\n'.join(p.read_text(errors='ignore') for p in root.rglob('*') if p.is_file())
           for token in forbidden:
@@ -79,7 +62,7 @@ jobs:
           cd artifact_stage
           python -m pip install -q -r requirements-v272.txt
           export PYTHONPATH="$PWD/src"
-          python -m unittest tests.test_v272
+          python -m unittest discover -s tests -p 'test_v272*.py' -v
           mkdir -p data/v272_free_chain
           python src/v272_cli.py all --data data/v272_free_chain --output v272_results --handoff runtime/V272_Actual_Inverse_Handoff.zip --no-record --record-minutes 0
           python src/v272_cli.py verify --output v272_results
