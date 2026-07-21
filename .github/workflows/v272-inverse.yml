@@ -19,6 +19,7 @@ jobs:
       - name: Install
         run: python -m pip install -q -r requirements-v272.txt
       - name: Run 27 authority tests
+        continue-on-error: true
         env:
           PYTHONPATH: ${{ github.workspace }}/src
           PYTHONHASHSEED: '0'
@@ -26,6 +27,17 @@ jobs:
           OPENBLAS_NUM_THREADS: '1'
           MKL_NUM_THREADS: '1'
         run: python scripts/run_v272_authority_tests.py
+      - name: Upload authority result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: V272_Authority_Result
+          path: V272_AUTHORITY_RESULTS.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce authority result
+        if: always()
+        run: python -c "import json; r=json.load(open('V272_AUTHORITY_RESULTS.json')); print(r); raise SystemExit(1 if r['failures'] else 0)"
       - name: Fail-closed smoke
         env:
           PYTHONPATH: ${{ github.workspace }}/src
