@@ -1,0 +1,329 @@
+name: K19 All-Target Structural Four-Stage Gate
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - .github/workflows/k19-all-target-structural-multistage.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+
+jobs:
+  stage1:
+    name: certificate-index-power-boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare byte-identical structural tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs source formal_tools
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x formal_tools/*.py collatz_k19/*.sh
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+          collatz_k19/prepare_k19_structural_stub_tree.sh source formal_tools | tee logs/structural_tree.out
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+
+          [[lean_lib]]
+          name = "K19AxiomAudit"
+          EOF
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+      - name: Build certificate stubs, power targets, and principal index
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+          lake build \
+            Erdos1135.KrasikovLagarias.Generated.K19Gamma14551 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotential \
+            Erdos1135.KrasikovLagarias.K19PowerOfTwoTargets \
+            Erdos1135.KrasikovLagarias.K19PrincipalIndex \
+            2>&1 | tee ../logs/stage1_build.out
+          grep -q 'Build completed successfully' ../logs/stage1_build.out
+          printf '%s\n' \
+            'K19_STRUCTURAL_CERTIFICATE_STUBS=PASS' \
+            'K19_STRUCTURAL_POWER_TARGETS=PASS' \
+            'K19_STRUCTURAL_PRINCIPAL_INDEX=PASS' \
+            | tee ../logs/stage1.verdict
+      - name: Save stage 1 boundary
+        uses: actions/cache/save@v5
+        with:
+          path: source/.lake/build
+          key: k19-structural-stage1-${{ github.run_id }}
+      - name: Upload stage 1 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-structural-stage1-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+
+  stage2:
+    name: coefficient-source-critical-boundary
+    needs: stage1
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare byte-identical structural tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs source formal_tools
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x formal_tools/*.py collatz_k19/*.sh
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+          collatz_k19/prepare_k19_structural_stub_tree.sh source formal_tools | tee logs/structural_tree.out
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+
+          [[lean_lib]]
+          name = "K19AxiomAudit"
+          EOF
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+      - name: Fetch exact dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+      - name: Restore stage 1 boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: k19-structural-stage1-${{ github.run_id }}
+          fail-on-cache-miss: true
+      - name: Build coefficient, source, and critical-choice bridges
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake build \
+            Erdos1135.KrasikovLagarias.K19CoefficientBridge \
+            Erdos1135.KrasikovLagarias.K19SourceBridge \
+            Erdos1135.KrasikovLagarias.K19CriticalChoice \
+            2>&1 | tee ../logs/stage2_build.out
+          grep -q 'Build completed successfully' ../logs/stage2_build.out
+          printf '%s\n' \
+            'K19_STRUCTURAL_COEFFICIENT_BRIDGE=PASS' \
+            'K19_STRUCTURAL_SOURCE_BRIDGE=PASS' \
+            'K19_STRUCTURAL_CRITICAL_CHOICE=PASS' \
+            | tee ../logs/stage2.verdict
+      - name: Save stage 2 boundary
+        uses: actions/cache/save@v5
+        with:
+          path: source/.lake/build
+          key: k19-structural-stage2-${{ github.run_id }}
+      - name: Upload stage 2 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-structural-stage2-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+
+  stage3:
+    name: predecessor-all-target-boundary
+    needs: stage2
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare byte-identical structural tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs source formal_tools
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x formal_tools/*.py collatz_k19/*.sh
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+          collatz_k19/prepare_k19_structural_stub_tree.sh source formal_tools | tee logs/structural_tree.out
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+
+          [[lean_lib]]
+          name = "K19AxiomAudit"
+          EOF
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+      - name: Fetch exact dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+      - name: Restore stage 2 boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: k19-structural-stage2-${{ github.run_id }}
+          fail-on-cache-miss: true
+      - name: Build predecessor and all-target bridges
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake build \
+            Erdos1135.KrasikovLagarias.K19PredecessorBridge \
+            Erdos1135.KrasikovLagarias.K19PredecessorAllTargets \
+            2>&1 | tee ../logs/stage3_build.out
+          grep -q 'Build completed successfully' ../logs/stage3_build.out
+          printf '%s\n' \
+            'K19_STRUCTURAL_PREDECESSOR_BRIDGE=PASS' \
+            'K19_STRUCTURAL_ALL_TARGET_BRIDGE=PASS' \
+            | tee ../logs/stage3.verdict
+      - name: Save stage 3 boundary
+        uses: actions/cache/save@v5
+        with:
+          path: source/.lake/build
+          key: k19-structural-stage3-${{ github.run_id }}
+      - name: Upload stage 3 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-structural-stage3-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+
+  stage4:
+    name: final-theorem-and-axiom-audit
+    needs: stage3
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare byte-identical structural tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs source formal_tools
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x formal_tools/*.py collatz_k19/*.sh
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+          collatz_k19/prepare_k19_structural_stub_tree.sh source formal_tools | tee logs/structural_tree.out
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+
+          [[lean_lib]]
+          name = "K19AxiomAudit"
+          EOF
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+      - name: Fetch exact dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+      - name: Restore stage 3 boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: k19-structural-stage3-${{ github.run_id }}
+          fail-on-cache-miss: true
+      - name: Compile publication theorem and audit exact explicit assumptions
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake build CollatzPredecessorK19 K19AxiomAudit \
+            2>&1 | tee ../logs/stage4_build.out
+          grep -q 'Build completed successfully' ../logs/stage4_build.out
+          lake env lean K19AxiomAudit.lean 2>&1 | tee ../logs/axiom_audit.out
+          grep -q 'k19Gamma14551EncodedCertificate_valid' ../logs/axiom_audit.out
+          grep -q 'k19AdaptiveForcedPotentialCertificate_valid' ../logs/axiom_audit.out
+          if grep -q 'sorryAx' ../logs/axiom_audit.out; then exit 5; fi
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              CollatzPredecessorK19.lean Erdos1135/KrasikovLagarias/K19*.lean; then
+            exit 6
+          fi
+          printf '%s\n' \
+            'K19_ALL_TARGET_STRUCTURAL_BUILD=PASS' \
+            'K19_ALL_TARGET_EXPLICIT_ASSUMPTIONS_ARE_ONLY_TWO_VALID_CERTIFICATES=PASS' \
+            'K19_ALL_TARGET_STRUCTURAL_NO_SORRYAX=PASS' \
+            | tee ../logs/verdict.out
+      - name: Upload final structural evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-all-target-structural-four-stage-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
