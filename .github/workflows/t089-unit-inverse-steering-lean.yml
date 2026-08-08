@@ -62,8 +62,15 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          lake env lean UnitInverseSteering.lean 2>&1 | tee ../logs/lean.out
-          lake env lean UnitInverseSteeringActual.lean 2>&1 | tee -a ../logs/lean.out
+          mkdir -p .lake/build/lib/lean
+          lake env lean UnitInverseSteering.lean \
+            -o .lake/build/lib/lean/UnitInverseSteering.olean \
+            -i .lake/build/lib/lean/UnitInverseSteering.ilean \
+            2>&1 | tee ../logs/lean.out
+          lake env lean UnitInverseSteeringActual.lean \
+            -o .lake/build/lib/lean/UnitInverseSteeringActual.olean \
+            -i .lake/build/lib/lean/UnitInverseSteeringActual.ilean \
+            2>&1 | tee -a ../logs/lean.out
           if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
           if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
               UnitInverseSteering.lean UnitInverseSteeringActual.lean; then
