@@ -6,6 +6,7 @@ on:
       - collatz-k19-gate-clean-20260808
     paths:
       - .github/workflows/k19-chunked-metadata-smoke.yml
+      - collatz_k19/ChunkedMetadataCertificate.lean
   workflow_dispatch:
 
 permissions:
