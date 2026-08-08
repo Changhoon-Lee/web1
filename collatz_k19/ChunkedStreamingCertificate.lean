@@ -5,7 +5,7 @@ import Mathlib.Tactic
 # Exact interval composition for large native certificate checks
 
 This module permits a finite-certificate row check to be split into consecutive
-intervals.  Each interval can be discharged by a separate `native_decide`.
+intervals. Each interval can be discharged by a separate `native_decide`.
 The interval proofs are then recombined in Lean into the unchanged
 `FiniteCertificate.Valid` proposition.
 -/
@@ -29,7 +29,8 @@ theorem allFrom_append (predicate : Nat → Bool) (start left right : Nat)
   by_cases hinLeft : offset < left
   · exact hleftMeaning offset hinLeft
   · have hleftLe : left ≤ offset := Nat.le_of_not_gt hinLeft
-    have hresidualLt : offset - left < right := by omega
+    have hresidualLt : offset - left < right :=
+      (Nat.sub_lt_iff_lt_add' hleftLe).2 hoffset
     have hvalue := hrightMeaning (offset - left) hresidualLt
     convert hvalue using 1 <;> omega
 
@@ -48,7 +49,8 @@ theorem rowsCheckRange_eq_true_iff (cert : FiniteCertificate)
     cert.rowsCheckRange start count = true ↔
       ∀ offset, offset < count → cert.RowValid (start + offset) := by
   unfold rowsCheckRange
-  exact NativeRange.allFrom_eq_true_iff _ _ _
+  rw [NativeRange.allFrom_eq_true_iff]
+  simp
 
 /-- Consecutive certificate intervals compose without re-running either check. -/
 theorem rowsCheckRange_append (cert : FiniteCertificate)
