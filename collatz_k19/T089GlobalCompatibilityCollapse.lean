@@ -50,8 +50,8 @@ theorem cancel_factor_of_bezout
     _ = x * (D * k) + D * (y * C) := by rw [hk]
     _ = D * (x * k + y * C) := by ring
 
-/-- One recurrence step propagates divisibility from the current compatibility
-numerator to the next one. -/
+/-- One recurrence step propagates divisibility by the current denominator to
+the next compatibility numerator. -/
 theorem divisibility_step
     {A C D Cnext a : ℤ} (x y : ℤ)
     (hbezout : x * A + y * D = 1)
@@ -78,8 +78,8 @@ theorem allDivisible_of_head
   | cons n rest =>
       cases rest with
       | nil =>
-          change n.D ∣ n.C
-          exact hhead
+          change n.D ∣ n.C ∧ True
+          exact ⟨hhead, trivial⟩
       | cons m rest =>
           change Step A n m ∧ GoodChain A (m :: rest) at hgood
           change n.D ∣ n.C at hhead
@@ -87,7 +87,14 @@ theorem allDivisible_of_head
           refine ⟨hhead, ?_⟩
           apply allDivisible_of_head hgood.2
           change m.D ∣ m.C
-          exact divisibility_step n.x n.y hgood.1.bezout hgood.1.numerator hhead
+          have hlarge : n.D ∣ m.C :=
+            divisibility_step n.x n.y hgood.1.bezout hgood.1.numerator hhead
+          rcases hlarge with ⟨k, hk⟩
+          refine ⟨(3 : ℤ) ^ n.r * k, ?_⟩
+          calc
+            m.C = n.D * k := hk
+            _ = ((3 : ℤ) ^ n.r * m.D) * k := by rw [hgood.1.denominator]
+            _ = m.D * ((3 : ℤ) ^ n.r * k) := by ring
 termination_by nodes.length
 
 /-- All exact intermediate divisibility conditions are equivalent to the one
