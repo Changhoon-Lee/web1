@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate reviewed K19 overlay and extract weighted-route structure
+      - name: Generate reviewed K19 overlay and extract sharp-delay structure
         shell: bash
         run: |
           set -euxo pipefail
@@ -41,13 +41,18 @@ jobs:
           python3 formal_tools/generate_k19_overlay_strict.py source \
             | tee logs/overlay.out
           grep -R -n -C 100 -E \
-            'exists_uniform_shiftBounds_of_terminalsRetarded|TerminalsRetarded|ShiftBounds|fullTree|theorem exponential_lower_bound|let constant|coefficientSum|principalCount' \
+            'structure Label|structure State|def value|def descend|principalChild|d1Child|d3Child|root_normalized_exists|TerminalsRetarded|ShiftBounds|fullTree|coefficientSum|principalCount' \
             source/Erdos1135/KrasikovLagarias --include='*.lean' \
-            > logs/weighted-route-neighborhood.txt || true
+            > logs/sharp-delay-neighborhood.txt || true
           printf '%s\n' \
             source/Erdos1135/KrasikovLagarias/AdaptiveCriticalChoice.lean \
-            source/Erdos1135/KrasikovLagarias/AdaptiveEliminationTree.lean \
+            source/Erdos1135/KrasikovLagarias/AdaptiveNormalizer.lean \
+            source/Erdos1135/KrasikovLagarias/AdaptiveEliminationAllowedFamily.lean \
+            source/Erdos1135/KrasikovLagarias/AdaptiveEliminationPolicy.lean \
+            source/Erdos1135/KrasikovLagarias/EliminationAllowedFamily.lean \
             source/Erdos1135/KrasikovLagarias/EliminationCriticalTree.lean \
+            source/Erdos1135/KrasikovLagarias/EliminationPolicy.lean \
+            source/Erdos1135/KrasikovLagarias/EliminationShift.lean \
             source/Erdos1135/KrasikovLagarias/EliminationUniformShiftBounds.lean \
             source/Erdos1135/KrasikovLagarias/Retarded.lean \
             source/Erdos1135/KrasikovLagarias/RetardedChoice.lean \
@@ -55,6 +60,7 @@ jobs:
             source/Erdos1135/KrasikovLagarias/K19CoefficientBridge.lean \
             source/Erdos1135/KrasikovLagarias/K19CriticalChoice.lean \
             source/Erdos1135/KrasikovLagarias/K19PredecessorBridge.lean \
+            source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.lean \
             > logs/matching-files.txt
           while IFS= read -r file; do
             [ -s "$file" ] || continue
@@ -67,7 +73,7 @@ jobs:
       - name: Upload source inspection evidence
         uses: actions/upload-artifact@v4
         with:
-          name: t090-k19-weighted-route-${{ github.run_id }}
+          name: t090-k19-sharp-delay-${{ github.run_id }}
           path: logs/
           if-no-files-found: error
           retention-days: 30
