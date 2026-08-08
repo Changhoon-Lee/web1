@@ -42,9 +42,10 @@ interval imply the original public `MetadataValid` proposition. -/
 theorem metadataValid_of_size_and_full_bounds
     {cert : AdaptiveForcedPotentialCertificate}
     (hk : 2 ≤ cert.k)
-    (hsize : cert.values.size = principalCount cert.k)
+    (hsize : cert.values.size = EliminationResidue.principalCount cert.k)
     (hbounds :
-      cert.metadataBoundsCheckRange 0 (principalCount cert.k) = true) :
+      cert.metadataBoundsCheckRange 0
+        (EliminationResidue.principalCount cert.k) = true) :
     cert.MetadataValid := by
   refine ⟨hk, hsize, ?_⟩
   intro index
@@ -56,8 +57,9 @@ theorem metadataValid_of_size_and_full_bounds
           decide (cert.values[rawIndex]'hindex ≤ cert.bound)
         else
           false)
-      0 (principalCount cert.k)).mp hbounds
-  have hprincipal : index.val < principalCount cert.k := by
+      0 (EliminationResidue.principalCount cert.k)).mp hbounds
+  have hprincipal :
+      index.val < EliminationResidue.principalCount cert.k := by
     rw [← hsize]
     exact index.isLt
   have hvalue := hall index.val hprincipal
