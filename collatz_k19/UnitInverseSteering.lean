@@ -392,19 +392,19 @@ def policyX : Nat → Nat
   | 242 => 80
   | _ => 0
 
-/-- The exact finite condition checked for each unit residue modulo `243`. -/
-def PolicyGood (y : Fin 243) : Prop :=
-  y.val % 3 ≠ 0 →
-    let e := policyE y.val
-    let x := policyX y.val
-    (2 ^ (e + 1) * y.val) % 243 = 3 * x + 1 ∧
-    x < 81 ∧
-    x % 3 ≠ 0 ∧
-    2 * e + phi x ≤ 3 + phi (y.val % 81)
+/-- A fully computational Boolean checker for the finite policy. -/
+def policyGoodBool (y : Nat) : Bool :=
+  (y % 3 == 0) ||
+    let e := policyE y
+    let x := policyX y
+    ((2 ^ (e + 1) * y) % 243 == 3 * x + 1) &&
+      decide (x < 81) &&
+      !(x % 3 == 0) &&
+      decide (2 * e + phi x ≤ 3 + phi (y % 81))
 
-/-- All 162 unit residue classes modulo `243` have a certified unit inverse
-odd step satisfying the mean-cost potential inequality. -/
-theorem finite_policy_valid : ∀ y : Fin 243, PolicyGood y := by
+/-- All 162 unit residue classes modulo `243` pass the exact Boolean policy
+checker. Nonunit residues are accepted vacuously. -/
+theorem finite_policy_valid : ∀ y : Fin 243, policyGoodBool y.val = true := by
   intro y
   fin_cases y <;> native_decide
 
@@ -416,7 +416,8 @@ theorem one_step_exists (y : Fin 243) (hy : y.val % 3 ≠ 0) :
       x % 3 ≠ 0 ∧
       2 * e + phi x ≤ 3 + phi (y.val % 81) := by
   refine ⟨policyE y.val, policyX y.val, ?_⟩
-  exact finite_policy_valid y hy
+  have h := finite_policy_valid y
+  simpa [policyGoodBool, hy] using h
 
 /-- The potential is globally bounded by `10` on residues modulo `81`. -/
 theorem phi_le_ten : ∀ x : Fin 81, phi x.val ≤ 10 := by
