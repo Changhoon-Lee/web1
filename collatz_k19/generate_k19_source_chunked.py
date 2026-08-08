@@ -109,9 +109,17 @@ theorem k19Gamma14551EncodedEncodingValid :
       {TOTAL} = true := by
   native_decide
 
-theorem k19Gamma14551EncodedCertificate_metadataValid :
-    k19Gamma14551EncodedCertificate.MetadataValid := by
+/-- Stack-safe executable metadata verification.  The public finite-certificate
+source defines `metadataCheck` with array folds instead of proposition-level
+`Fintype` enumeration over all 387,420,489 rows. -/
+theorem k19Gamma14551EncodedCertificate_metadataCheck :
+    k19Gamma14551EncodedCertificate.metadataCheck = true := by
   native_decide
+
+theorem k19Gamma14551EncodedCertificate_metadataValid :
+    k19Gamma14551EncodedCertificate.MetadataValid :=
+  (k19Gamma14551EncodedCertificate.metadataCheck_eq_true_iff).mp
+    k19Gamma14551EncodedCertificate_metadataCheck
 
 end KrasikovLagarias
 end Erdos1135
