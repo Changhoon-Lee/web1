@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate reviewed K19 overlay and extract constant construction
+      - name: Generate reviewed K19 overlay and extract constant normalization
         shell: bash
         run: |
           set -euxo pipefail
@@ -41,10 +41,15 @@ jobs:
           python3 formal_tools/generate_k19_overlay_strict.py source \
             | tee logs/overlay.out
           grep -R -n -C 80 -E \
-            'theorem exponential_lower_bound|def.*constant|envelopeConstant|phiValues19_exponential_lower_bound|gamma14551|lambda14551' \
+            'theorem exponential_lower_bound|let constant|coefficientSum|principalCount|phiValues19_exponential_lower_bound|gamma14551|lambda14551' \
             source --include='*.lean' > logs/theorem-neighborhood.txt || true
+          grep -R -n -E \
+            'def principalCount|principalCount 19|principalCount :=|principalCount=' \
+            source --include='*.lean' > logs/principal-count.txt || true
           printf '%s\n' \
             source/Erdos1135/KrasikovLagarias/AdaptiveCriticalChoice.lean \
+            source/Erdos1135/KrasikovLagarias/EliminationResidue.lean \
+            source/Erdos1135/KrasikovLagarias/FiniteCertificate.lean \
             source/Erdos1135/KrasikovLagarias/K19CoefficientBridge.lean \
             source/Erdos1135/KrasikovLagarias/K19CriticalChoice.lean \
             source/Erdos1135/KrasikovLagarias/K19PredecessorBridge.lean \
@@ -57,7 +62,7 @@ jobs:
           done < logs/matching-files.txt
           find formal_tools -maxdepth 2 -type f -print0 | sort -z \
             | xargs -0 grep -n -H -E \
-              'theorem exponential_lower_bound|envelopeConstant|gamma14551|lambda14551' \
+              'theorem exponential_lower_bound|let constant|coefficientSum|principalCount|gamma14551|lambda14551' \
               > logs/generator-neighborhood.txt || true
           find logs -type f -print0 | sort -z | xargs -0 sha256sum > logs/sha256.txt
 
