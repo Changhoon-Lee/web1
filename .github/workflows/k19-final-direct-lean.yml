@@ -212,7 +212,7 @@ jobs:
             'K19_ADAPTIVE_EXACT_VALID=PASS' \
             | tee logs/adaptive_boundary.verdict
 
-      - name: Build all non-certificate dependencies before freezing binary certificates
+      - name: Build all non-certificate and adaptive payload dependencies before freezing binary certificates
         working-directory: source
         shell: bash
         run: |
@@ -222,13 +222,28 @@ jobs:
             Erdos1135.KrasikovLagarias.K19PrincipalIndex \
             Erdos1135.KrasikovLagarias.K19SourceBridge \
             Erdos1135.KrasikovLagarias.AdaptiveCriticalChoice \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk00 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk01 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk02 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk03 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk04 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk05 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk06 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk07 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk08 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk09 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk10 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk11 \
             2>&1 | tee ../logs/noncertificate_dependencies.out
           grep -q 'Build completed successfully' ../logs/noncertificate_dependencies.out
+          test "$(find .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated \
+            -name 'K19AdaptiveForcedPotentialHexChunk??.olean' | wc -l)" -eq 12
           printf '%s\n' \
             'K19_POWER_TARGETS_PREBUILT=PASS' \
             'K19_PRINCIPAL_INDEX_PREBUILT=PASS' \
             'K19_SOURCE_BRIDGE_PREBUILT=PASS' \
             'K19_ADAPTIVE_CRITICAL_CHOICE_PREBUILT=PASS' \
+            'K19_ADAPTIVE_HEX_CHUNKS_PREBUILT=PASS' \
             | tee ../logs/noncertificate_dependencies.verdict
 
       - name: Freeze authenticated generated certificates as binary imports
