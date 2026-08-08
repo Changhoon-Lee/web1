@@ -39,7 +39,7 @@ theorem rpow_complement_step
     linarith
   have hones : 0 ≤ 1 + s := by linarith
   have hbern :=
-    Real.rpow_one_add_le_one_add_mul_self hs htheta0.le htheta1
+    rpow_one_add_le_one_add_mul_self hs htheta0.le htheta1
   have hscaled :=
     mul_le_mul_of_nonneg_left hbern (Real.rpow_nonneg hnnonneg theta)
   have hcast : ((n - 1 : ℕ) : ℝ) = (n : ℝ) - 1 := by
@@ -89,15 +89,16 @@ theorem theta_mul_sum_Icc_rpow_sub_one_le
       have hcast : (((H + 1 : ℕ) - 1 : ℕ) : ℝ) = (H : ℝ) := by
         norm_num
       rw [hcast] at hstep
+      norm_num only [Nat.cast_add, Nat.cast_one] at hstep ⊢
       calc
-        theta * ((H + 1 : ℝ) ^ (theta - 1) +
+        theta * (((H : ℝ) + 1) ^ (theta - 1) +
             ∑ n ∈ Finset.Icc 1 H, (n : ℝ) ^ (theta - 1)) =
             theta * (∑ n ∈ Finset.Icc 1 H, (n : ℝ) ^ (theta - 1)) +
-              theta * (H + 1 : ℝ) ^ (theta - 1) := by ring
+              theta * ((H : ℝ) + 1) ^ (theta - 1) := by ring
         _ ≤ (H : ℝ) ^ theta +
-              ((H + 1 : ℝ) ^ theta - (H : ℝ) ^ theta) :=
+              (((H : ℝ) + 1) ^ theta - (H : ℝ) ^ theta) :=
           add_le_add ih hstep
-        _ = (H + 1 : ℝ) ^ theta := by ring
+        _ = ((H : ℝ) + 1) ^ theta := by ring
 
 /-- Divided form of the exact harmonic ceiling. -/
 theorem sum_Icc_rpow_sub_one_le
