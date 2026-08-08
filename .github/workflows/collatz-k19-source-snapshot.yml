@@ -1,0 +1,39 @@
+name: Collatz K19 Pinned Lean Source Snapshot
+
+on:
+  push:
+    branches:
+      - collatz-k19-formal-gate-20260808
+    paths:
+      - .github/workflows/collatz-k19-source-snapshot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch, pin, and retain only formal source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source snapshot
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$RUNNER_TEMP/source.tar.gz"
+          tar -xzf "$RUNNER_TEMP/source.tar.gz" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee snapshot/pinned_source.out
+          find source -type f \( -name '*.lean' -o -name 'lakefile.toml' -o -name 'lake-manifest.json' -o -name 'lean-toolchain' \) -print0 \
+            | tar --null -T - -czf snapshot/pinned_lean_source.tar.gz
+          sha256sum snapshot/pinned_lean_source.tar.gz | tee snapshot/pinned_lean_source.tar.gz.sha256
+          find source -type f -name '*.lean' -printf '%P\t%s\n' | sort | tee snapshot/lean_inventory.tsv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: collatz-k19-pinned-lean-source-${{ github.run_id }}
+          path: snapshot/
+          if-no-files-found: error
+          retention-days: 30
