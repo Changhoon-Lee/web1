@@ -1,0 +1,192 @@
+name: K19 Exact Weight Statistics
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - .github/workflows/k19-weight-statistics.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+
+jobs:
+  exact-statistics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct and authenticate the exact K19 weight payload
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 \
+            > "$RUNNER_TEMP/reproducers.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          chmod +x reproducers/*.sh
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" \
+            | sha256sum --check - | tee logs/weight-hash.out
+          echo "WEIGHT_FILE=$WORK/k19_gamma14551_16000.u32le" \
+            >> "$GITHUB_ENV"
+
+      - name: Compute exact streaming statistics and critical-density verdict
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat > "$RUNNER_TEMP/k19_weight_stats.cpp" <<'CPP'
+          #include <algorithm>
+          #include <array>
+          #include <cmath>
+          #include <cstdint>
+          #include <fstream>
+          #include <iomanip>
+          #include <iostream>
+          #include <limits>
+          #include <string>
+          #include <vector>
+
+          static std::string u128_to_string(unsigned __int128 x) {
+            if (x == 0) return "0";
+            std::string s;
+            while (x > 0) {
+              s.push_back(char('0' + x % 10));
+              x /= 10;
+            }
+            std::reverse(s.begin(), s.end());
+            return s;
+          }
+
+          int main(int argc, char** argv) {
+            if (argc != 2) {
+              std::cerr << "usage: k19_weight_stats FILE\n";
+              return 2;
+            }
+            const std::string path = argv[1];
+            std::ifstream in(path, std::ios::binary);
+            if (!in) {
+              std::cerr << "cannot open " << path << "\n";
+              return 3;
+            }
+            constexpr size_t CHUNK = 1u << 20;
+            std::vector<uint32_t> buf(CHUNK);
+            uint64_t count = 0;
+            uint32_t minv = std::numeric_limits<uint32_t>::max();
+            uint32_t maxv = 0;
+            unsigned __int128 sum = 0;
+            std::array<unsigned __int128, 3> sum_mod3{};
+            std::array<uint64_t, 3> count_mod3{};
+            while (in) {
+              in.read(reinterpret_cast<char*>(buf.data()),
+                      std::streamsize(buf.size() * sizeof(uint32_t)));
+              const size_t n = size_t(in.gcount()) / sizeof(uint32_t);
+              for (size_t j = 0; j < n; ++j) {
+                const uint32_t w = buf[j];
+                minv = std::min(minv, w);
+                maxv = std::max(maxv, w);
+                sum += w;
+                const unsigned r = unsigned(count % 3);
+                sum_mod3[r] += w;
+                ++count_mod3[r];
+                ++count;
+              }
+            }
+            if (count == 0) return 4;
+            in.clear();
+            in.seekg(0);
+            const std::array<long double, 8> fractions =
+              {1.0L, 0.99L, 0.975L, 0.95L, 0.9L, 0.75L, 0.5L, 0.25L};
+            std::array<uint64_t, 8> above{};
+            std::array<unsigned __int128, 8> mass_above{};
+            uint64_t equal_max = 0;
+            while (in) {
+              in.read(reinterpret_cast<char*>(buf.data()),
+                      std::streamsize(buf.size() * sizeof(uint32_t)));
+              const size_t n = size_t(in.gcount()) / sizeof(uint32_t);
+              for (size_t j = 0; j < n; ++j) {
+                const uint32_t w = buf[j];
+                if (w == maxv) ++equal_max;
+                for (size_t q = 0; q < fractions.size(); ++q) {
+                  if ((long double)w + 1e-18L >= fractions[q] * (long double)maxv) {
+                    ++above[q];
+                    mass_above[q] += w;
+                  }
+                }
+              }
+            }
+            const long double N = (long double)count;
+            const long double M = (long double)maxv;
+            const long double sum_ld = (long double)sum;
+            const long double mean_over_max = sum_ld / (N * M);
+            const long double gamma = 14551.0L / 16000.0L;
+            const long double theta = 1449.0L / 16000.0L;
+            const long double delay_factor = std::pow(2.0L, -2.0L * gamma);
+            const long double critical_D = 2.0L / delay_factor;
+            const long double unit_harmonic_D = (2.0L / 3.0L) / theta;
+            const long double weighted_unit_D = unit_harmonic_D * mean_over_max;
+            const long double required_mean_over_max = critical_D / unit_harmonic_D;
+
+            std::cout << std::setprecision(20);
+            std::cout << "COUNT=" << count << "\n";
+            std::cout << "EXPECTED_COUNT=" << 387420489ULL << "\n";
+            std::cout << "MIN_WEIGHT=" << minv << "\n";
+            std::cout << "MAX_WEIGHT=" << maxv << "\n";
+            std::cout << "EQUAL_MAX_COUNT=" << equal_max << "\n";
+            std::cout << "SUM_WEIGHT=" << u128_to_string(sum) << "\n";
+            std::cout << "MEAN_OVER_MAX=" << mean_over_max << "\n";
+            std::cout << "GAMMA=" << gamma << "\n";
+            std::cout << "THETA=" << theta << "\n";
+            std::cout << "DELAY_FACTOR_2_NEG_2GAMMA=" << delay_factor << "\n";
+            std::cout << "CRITICAL_D_REQUIRED=" << critical_D << "\n";
+            std::cout << "UNWEIGHTED_UNIT_D=" << unit_harmonic_D << "\n";
+            std::cout << "REQUIRED_MEAN_OVER_MAX=" << required_mean_over_max << "\n";
+            std::cout << "ALL_UNIT_WEIGHTED_D=" << weighted_unit_D << "\n";
+            std::cout << "ALL_UNIT_MARGIN_RATIO=" << weighted_unit_D / critical_D << "\n";
+            std::cout << "ALL_UNIT_MAX_NORMALIZED_GATE="
+                      << (weighted_unit_D > critical_D ? "PASS_NUMERIC" : "FAIL_NUMERIC")
+                      << "\n";
+            for (size_t q = 0; q < fractions.size(); ++q) {
+              std::cout << "COUNT_GE_" << fractions[q] << "_MAX=" << above[q] << "\n";
+              std::cout << "FRACTION_GE_" << fractions[q] << "_MAX="
+                        << (long double)above[q] / N << "\n";
+              std::cout << "MASS_FRACTION_GE_" << fractions[q] << "_MAX="
+                        << (long double)mass_above[q] / sum_ld << "\n";
+            }
+            for (unsigned r = 0; r < 3; ++r) {
+              std::cout << "INDEX_MOD3_" << r << "_COUNT=" << count_mod3[r] << "\n";
+              std::cout << "INDEX_MOD3_" << r << "_MEAN_OVER_MAX="
+                        << (long double)sum_mod3[r] /
+                           ((long double)count_mod3[r] * M) << "\n";
+            }
+            if (count != 387420489ULL) return 5;
+            return 0;
+          }
+          CPP
+          g++ -O3 -std=c++20 "$RUNNER_TEMP/k19_weight_stats.cpp" \
+            -o "$RUNNER_TEMP/k19_weight_stats"
+          /usr/bin/time -v "$RUNNER_TEMP/k19_weight_stats" "$WEIGHT_FILE" \
+            2>&1 | tee logs/weight-statistics.txt
+          grep -q '^COUNT=387420489$' logs/weight-statistics.txt
+          grep -q '^MAX_WEIGHT=' logs/weight-statistics.txt
+          grep -q '^MEAN_OVER_MAX=' logs/weight-statistics.txt
+          sha256sum logs/* | tee logs/manifest.sha256
+
+      - name: Upload exact statistics evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-exact-weight-statistics-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
