@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Generate a K19 adaptive-potential wrapper split into exact row intervals."""
+"""Generate a K19 adaptive-potential wrapper split at two exact boundaries.
+
+The payload text is split into one Lean module per hexadecimal file so that no
+single elaboration unit contains the complete 774 MB textual payload.  Row
+validity is independently split into consecutive native-decidable intervals.
+Both decompositions are recombined inside Lean without changing the public
+`AdaptiveForcedPotentialCertificate.Valid` proposition.
+"""
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
 TOTAL = 387_420_489
-
-
-def includes(relative: str, files: list[Path]) -> str:
-    return ",\n".join(
-        f'  include_str "../../../artifacts/kl_predecessor/{relative}/{p.name}"'
-        for p in files
-    )
 
 
 def split_counts(total: int, chunks: int) -> list[tuple[int, int]]:
@@ -43,24 +43,61 @@ def main() -> None:
 
     generated = root / "Erdos1135/KrasikovLagarias/Generated"
     generated.mkdir(parents=True, exist_ok=True)
+    for stale in generated.glob("K19AdaptiveForcedPotentialHexChunk*.lean"):
+        stale.unlink()
 
-    data = generated / "K19AdaptiveForcedPotentialData.lean"
-    data.write_text(f'''import Erdos1135.KrasikovLagarias.AdaptiveForcedPotentialCertificate
-import Erdos1135.KrasikovLagarias.ChunkedEncoding
-import Erdos1135.KrasikovLagarias.ChunkedStreamingCertificate
+    payload_imports: list[str] = []
+    payload_refs: list[str] = []
+    for i, payload in enumerate(files):
+        stem = f"K19AdaptiveForcedPotentialHexChunk{i:02d}"
+        value = f"k19AdaptiveForcedPotentialHexChunk{i:02d}"
+        payload_imports.append(
+            f"import Erdos1135.KrasikovLagarias.Generated.{stem}"
+        )
+        payload_refs.append(f"  {value}")
+        (generated / f"{stem}.lean").write_text(f'''import Erdos1135.KrasikovLagarias.ChunkedEncoding
 
 namespace Erdos1135
 namespace KrasikovLagarias
 
-def k19AdaptiveForcedPotentialHexChunks : Array String := #[
-{includes("k19_adaptive_potential", files)}
-]
+/-- One independently elaborated hexadecimal payload fragment. -/
+def {value} : String :=
+  include_str "../../../artifacts/kl_predecessor/k19_adaptive_potential/{payload.name}"
 
-def k19AdaptiveForcedPotentialCertificate :
-    AdaptiveForcedPotentialCertificate where
-  k := 19
-  bound := 36
-  values := decodeU8HexChunks k19AdaptiveForcedPotentialHexChunks
+end KrasikovLagarias
+end Erdos1135
+''', encoding="utf-8")
+
+    data = generated / "K19AdaptiveForcedPotentialData.lean"
+    data.write_text("\n".join([
+        "import Erdos1135.KrasikovLagarias.AdaptiveForcedPotentialCertificate",
+        "import Erdos1135.KrasikovLagarias.ChunkedEncoding",
+        "import Erdos1135.KrasikovLagarias.ChunkedStreamingCertificate",
+        *payload_imports,
+        "",
+        "namespace Erdos1135",
+        "namespace KrasikovLagarias",
+        "",
+        "def k19AdaptiveForcedPotentialHexChunks : Array String := #[",
+        ",\n".join(payload_refs),
+        "]",
+        "",
+        "def k19AdaptiveForcedPotentialCertificate :",
+        "    AdaptiveForcedPotentialCertificate where",
+        "  k := 19",
+        "  bound := 36",
+        "  values := decodeU8HexChunks k19AdaptiveForcedPotentialHexChunks",
+        "",
+        "end KrasikovLagarias",
+        "end Erdos1135",
+        "",
+    ]), encoding="utf-8")
+
+    metadata = generated / "K19AdaptiveForcedPotentialMetadata.lean"
+    metadata.write_text(f'''import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialData
+
+namespace Erdos1135
+namespace KrasikovLagarias
 
 theorem k19AdaptiveForcedPotentialEncodingValid :
     u8HexChunksEncodingValid k19AdaptiveForcedPotentialHexChunks
@@ -83,7 +120,7 @@ end Erdos1135
         theorem = f"k19AdaptiveForcedPotentialRows{i:02d}"
         imports.append(f"import Erdos1135.KrasikovLagarias.Generated.{stem}")
         theorem_names.append(theorem)
-        (generated / f"{stem}.lean").write_text(f'''import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialData
+        (generated / f"{stem}.lean").write_text(f'''import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialMetadata
 
 namespace Erdos1135
 namespace KrasikovLagarias
@@ -125,7 +162,7 @@ end Erdos1135
 
     aggregate = generated / "K19AdaptiveForcedPotential.lean"
     aggregate.write_text("\n".join([
-        "import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialData",
+        "import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialMetadata",
         *imports,
         "",
         "namespace Erdos1135",
@@ -147,6 +184,7 @@ end Erdos1135
 '''
     ]), encoding="utf-8")
 
+    print(f"PAYLOAD_MODULES={len(files)}")
     print(f"ROW_CHUNKS={len(intervals)}")
     for i, (start, count) in enumerate(intervals):
         print(f"CHUNK_{i:02d}_START={start}")
