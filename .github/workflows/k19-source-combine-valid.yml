@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p logs reproducers formal_tools source
+          mkdir -p logs reproducers formal_tools source boundary
           base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
           base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
           echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
@@ -90,6 +90,10 @@ jobs:
             --chunk-bytes 33554432 | tee logs/hex.out
           python3 collatz_k19/generate_k19_source_chunked.py source --row-chunks 8 \
             | tee logs/generator.out
+          sha256sum \
+            source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Data.lean \
+            source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Metadata.lean \
+            | tee logs/generated_boundaries.sha256
 
       - name: Restore exact source MetadataValid boundary
         uses: actions/cache/restore@v5
@@ -149,10 +153,27 @@ jobs:
           fi
           printf '%s\n' \
             'K19_SOURCE_EIGHT_INTERVALS_NATIVE=PASS' \
+            'K19_SOURCE_DEPENDENCY_HASH_AUTHENTICATION=PASS' \
             'K19_SOURCE_INTERVAL_COMPOSITION=PASS' \
             'K19_SOURCE_VALID_AXIOM_AUDIT=PASS_NO_SORRYAX' \
             'K19_SOURCE_EXACT_VALID=PASS' \
             | tee ../logs/verdict.out
+
+      - name: Package exact source Valid boundary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=source/.lake/build/lib/lean/Erdos1135/KrasikovLagarias
+          GEN="$BASE/Generated"
+          mkdir -p boundary/Erdos1135/KrasikovLagarias/Generated
+          cp "$BASE/StreamingCertificate.olean" boundary/Erdos1135/KrasikovLagarias/
+          cp "$BASE/ChunkedStreamingCertificate.olean" boundary/Erdos1135/KrasikovLagarias/
+          cp "$GEN/K19Gamma14551Data.olean" boundary/Erdos1135/KrasikovLagarias/Generated/
+          cp "$GEN/K19Gamma14551Metadata.olean" boundary/Erdos1135/KrasikovLagarias/Generated/
+          cp "$GEN"/K19Gamma14551Rows??.olean boundary/Erdos1135/KrasikovLagarias/Generated/
+          cp "$GEN/K19Gamma14551.olean" boundary/Erdos1135/KrasikovLagarias/Generated/
+          find boundary -type f -print0 | sort -z | xargs -0 sha256sum \
+            | tee logs/boundary.sha256
 
       - name: Save exact source Valid boundary
         uses: actions/cache/save@v5
@@ -160,11 +181,14 @@ jobs:
           path: source/.lake/build
           key: k19-source-exact-valid-${{ runner.os }}-${{ github.sha }}
 
-      - name: Upload composed source evidence
+      - name: Upload exact source Valid boundary and evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: k19-source-composed-${{ github.run_id }}
-          path: logs/
+          name: k19-source-exact-valid-boundary-${{ github.run_id }}
+          path: |
+            boundary/
+            logs/
           if-no-files-found: error
           retention-days: 30
+          compression-level: 0
