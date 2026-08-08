@@ -52,6 +52,9 @@ jobs:
           set -euxo pipefail
           lake update
           lake exe cache get
+          lake build Erdos1135.KrasikovLagarias.AdaptiveCriticalChoice \
+            2>&1 | tee ../logs/dependencies.out
+          grep -q 'Build completed successfully' ../logs/dependencies.out
 
       - name: Compile theorem and audit axioms
         working-directory: source
