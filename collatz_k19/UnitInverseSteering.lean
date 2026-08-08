@@ -405,7 +405,8 @@ def PolicyGood (y : Fin 243) : Prop :=
 /-- All 162 unit residue classes modulo `243` have a certified unit inverse
 odd step satisfying the mean-cost potential inequality. -/
 theorem finite_policy_valid : ∀ y : Fin 243, PolicyGood y := by
-  native_decide
+  intro y
+  fin_cases y <;> native_decide
 
 /-- Existential surface of the finite certificate. -/
 theorem one_step_exists (y : Fin 243) (hy : y.val % 3 ≠ 0) :
@@ -419,7 +420,8 @@ theorem one_step_exists (y : Fin 243) (hy : y.val % 3 ≠ 0) :
 
 /-- The potential is globally bounded by `10` on residues modulo `81`. -/
 theorem phi_le_ten : ∀ x : Fin 81, phi x.val ≤ 10 := by
-  native_decide
+  intro x
+  fin_cases x <;> native_decide
 
 /-- Abstract chain of certified inverse odd steps. `R` is the number of odd
 steps, `E` is the accumulated number of intervening even steps, and `p0,pR`
