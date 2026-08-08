@@ -1,0 +1,252 @@
+name: K19 Source Split Clean Gate
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/source_split_trigger.env
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k19-source-split-clean
+  cancel-in-progress: false
+
+env:
+  LEAN_STACK_SIZE_KB: 1572864
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact assets and pinned source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Generate split source payload modules
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd source
+          lake update
+          lake exe cache get
+          cd ..
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/ChunkedStreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean
+          python3 formal_tools/generate_hex_artifacts.py \
+            "$WORK/k19_gamma14551_16000.u32le" \
+            source/artifacts/kl_predecessor/k19_g14551_16000 \
+            --chunk-bytes 33554432 | tee logs/hex.out
+          python3 collatz_k19/generate_k19_source_chunked.py source --row-chunks 8 \
+            | tee logs/generator.out
+          test "$(find source/Erdos1135/KrasikovLagarias/Generated \
+            -name 'K19Gamma14551HexChunk??.lean' | wc -l)" -eq 47
+
+      - name: Compile 47 payload modules and reference-only Data module
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          heartbeat() {
+            while true; do
+              echo "SOURCE_DATA_HEARTBEAT $(date -u +%FT%TZ)"
+              free -h | sed -n '1,3p'
+              sleep 30
+            done
+          }
+          heartbeat & hb=$!
+          set +e
+          /usr/bin/time -v timeout 6600 lake build \
+            Erdos1135.KrasikovLagarias.Generated.K19Gamma14551Data \
+            2>&1 | tee ../logs/data_build.out
+          status=${PIPESTATUS[0]}
+          set -e
+          kill "$hb" 2>/dev/null || true
+          wait "$hb" 2>/dev/null || true
+          test "$status" -eq 0
+          grep -q 'Build completed successfully' ../logs/data_build.out
+          test "$(find .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated \
+            -name 'K19Gamma14551HexChunk??.olean' | wc -l)" -eq 47
+          sha256sum .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Data.olean \
+            | tee ../logs/data_olean.sha256
+          printf '%s\n' \
+            'SOURCE_PAYLOAD_MODULES=47' \
+            'SOURCE_SPLIT_DATA_BUILD=PASS' | tee ../logs/data.verdict
+
+      - name: Save exact compiled Data boundary
+        uses: actions/cache/save@v5
+        with:
+          path: source/.lake/build
+          key: k19-source-split-data-${{ runner.os }}-${{ github.sha }}
+
+      - name: Upload Data evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-source-split-data-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+
+  metadata:
+    needs: data
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact assets and identical pinned source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Generate byte-identical split source tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd source
+          lake update
+          lake exe cache get
+          cd ..
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/ChunkedStreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean
+          python3 formal_tools/generate_hex_artifacts.py \
+            "$WORK/k19_gamma14551_16000.u32le" \
+            source/artifacts/kl_predecessor/k19_g14551_16000 \
+            --chunk-bytes 33554432 | tee logs/hex.out
+          python3 collatz_k19/generate_k19_source_chunked.py source --row-chunks 8 \
+            | tee logs/generator.out
+
+      - name: Restore exact compiled Data boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: k19-source-split-data-${{ runner.os }}-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Add non-conflicting swap
+        shell: bash
+        run: |
+          set -euxo pipefail
+          swapon --show | tee logs/swap.before
+          sudo fallocate -l 12G /mnt/k19-source.swap
+          sudo chmod 600 /mnt/k19-source.swap
+          sudo mkswap /mnt/k19-source.swap
+          sudo swapon /mnt/k19-source.swap
+          swapon --show | tee logs/swap.after
+
+      - name: Run exact encoding and MetadataValid native checks
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          heartbeat() {
+            while true; do
+              echo "SOURCE_METADATA_HEARTBEAT $(date -u +%FT%TZ)"
+              free -h | sed -n '1,3p'
+              sleep 30
+            done
+          }
+          heartbeat & hb=$!
+          set +e
+          /usr/bin/time -v timeout 9600 lake build \
+            Erdos1135.KrasikovLagarias.Generated.K19Gamma14551Metadata \
+            2>&1 | tee ../logs/metadata_build.out
+          status=${PIPESTATUS[0]}
+          set -e
+          kill "$hb" 2>/dev/null || true
+          wait "$hb" 2>/dev/null || true
+          test "$status" -eq 0
+          grep -q 'Build completed successfully' ../logs/metadata_build.out
+          printf '%s\n' \
+            'SOURCE_ENCODING_NATIVE=PASS' \
+            'SOURCE_METADATA_NATIVE=PASS' \
+            'SOURCE_SPLIT_METADATA_GATE=PASS' | tee ../logs/verdict.out
+
+      - name: Save exact Metadata boundary
+        uses: actions/cache/save@v5
+        with:
+          path: source/.lake/build
+          key: k19-source-split-metadata-${{ runner.os }}-${{ github.sha }}
+
+      - name: Upload Metadata evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-source-split-metadata-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
