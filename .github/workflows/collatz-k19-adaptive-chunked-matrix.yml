@@ -1,0 +1,260 @@
+name: Collatz K19 Adaptive Chunked Native Matrix
+
+on:
+  push:
+    branches:
+      - collatz-k19-formal-gate-20260808
+    paths:
+      - .github/workflows/collatz-k19-adaptive-chunked-matrix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  row-native:
+    name: adaptive-row-${{ matrix.idx }}
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          - idx: '00'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows00
+          - idx: '01'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows01
+          - idx: '02'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows02
+          - idx: '03'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows03
+          - idx: '04'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows04
+          - idx: '05'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows05
+          - idx: '06'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows06
+          - idx: '07'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows07
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact K19 assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee 'logs/reconstruction.${{ matrix.idx }}.out'
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+
+      - name: Fetch hash-pinned formal source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source \
+            | tee 'logs/pinned_source.${{ matrix.idx }}.out'
+
+      - name: Install pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch exact dependencies and generate eight adaptive row modules
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd source
+          lake update
+          lake exe cache get
+          cd ..
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/ChunkedStreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean
+          python3 formal_tools/generate_hex_artifacts.py \
+            "$WORK/k19_adaptive_potential.u8" \
+            source/artifacts/kl_predecessor/k19_adaptive_potential \
+            --chunk-bytes 33554432 | tee 'logs/hex.${{ matrix.idx }}.out'
+          python3 collatz_k19/generate_k19_adaptive_chunked.py source --row-chunks 8 \
+            | tee 'logs/generator.${{ matrix.idx }}.out'
+
+      - name: Prove one exact consecutive adaptive interval
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v timeout 6600 lake build '${{ matrix.module }}' \
+            2>&1 | tee '../logs/adaptive-row.${{ matrix.idx }}.out'
+          grep -q 'Build completed successfully' '../logs/adaptive-row.${{ matrix.idx }}.out'
+          OLEAN_DIR=.lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated
+          test -s "$OLEAN_DIR/K19AdaptiveForcedPotentialData.olean"
+          test -s "$OLEAN_DIR/K19AdaptiveForcedPotentialRows${{ matrix.idx }}.olean"
+          mkdir -p ../row_artifact
+          cp "$OLEAN_DIR/K19AdaptiveForcedPotentialRows${{ matrix.idx }}.olean" ../row_artifact/
+          sha256sum "$OLEAN_DIR/K19AdaptiveForcedPotentialData.olean" | awk '{print $1}' \
+            > '../row_artifact/data.${{ matrix.idx }}.sha256'
+          printf 'K19_ADAPTIVE_ROW_%s_NATIVE=PASS\n' '${{ matrix.idx }}' \
+            | tee '../logs/adaptive-row.${{ matrix.idx }}.verdict'
+
+      - name: Upload exact adaptive row proof object
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-adaptive-row-${{ matrix.idx }}-${{ github.run_id }}
+          path: row_artifact/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload adaptive row evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-adaptive-row-evidence-${{ matrix.idx }}-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+
+  combine-adaptive-valid:
+    name: combine-adaptive-valid
+    needs: row-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact K19 assets and pinned source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.combine.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.combine.out
+
+      - name: Install pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch dependencies and regenerate byte-identical adaptive sources
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd source
+          lake update
+          lake exe cache get
+          cd ..
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/ChunkedStreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean
+          python3 formal_tools/generate_hex_artifacts.py \
+            "$WORK/k19_adaptive_potential.u8" \
+            source/artifacts/kl_predecessor/k19_adaptive_potential \
+            --chunk-bytes 33554432 | tee logs/hex.combine.out
+          python3 collatz_k19/generate_k19_adaptive_chunked.py source --row-chunks 8 \
+            | tee logs/generator.combine.out
+          cd source
+          lake build Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialData \
+            2>&1 | tee ../logs/data.combine.out
+
+      - name: Download all exact adaptive row proof objects
+        uses: actions/download-artifact@v4
+        with:
+          pattern: k19-adaptive-row-??-${{ github.run_id }}
+          path: row_artifacts
+          merge-multiple: true
+
+      - name: Authenticate imported proof objects and compose adaptive Valid
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OLEAN_DIR=source/.lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated
+          DATA_HASH=$(sha256sum "$OLEAN_DIR/K19AdaptiveForcedPotentialData.olean" | awk '{print $1}')
+          test "$(find row_artifacts -name 'data.*.sha256' | wc -l)" -eq 8
+          for hash_file in row_artifacts/data.*.sha256; do
+            test "$(cat "$hash_file")" = "$DATA_HASH"
+          done
+          test "$(find row_artifacts -name 'K19AdaptiveForcedPotentialRows??.olean' | wc -l)" -eq 8
+          cp row_artifacts/K19AdaptiveForcedPotentialRows??.olean "$OLEAN_DIR/"
+          cat > source/K19AdaptiveChunkAxiomAudit.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotential
+          #print axioms Erdos1135.KrasikovLagarias.k19AdaptiveForcedPotentialCertificate_valid
+          EOF
+          cd source
+          lake env lean Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.lean \
+            -o .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.olean \
+            -i .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.ilean \
+            2>&1 | tee ../logs/aggregate.out
+          lake env lean K19AdaptiveChunkAxiomAudit.lean \
+            2>&1 | tee ../logs/axiom_audit.out
+          if grep -q 'sorryAx' ../logs/axiom_audit.out; then
+            exit 5
+          fi
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean \
+              Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential*.lean; then
+            exit 6
+          fi
+          printf '%s\n' \
+            'K19_ADAPTIVE_8_INTERVALS_NATIVE=PASS' \
+            'K19_ADAPTIVE_INTERVAL_COMPOSITION=PASS' \
+            'K19_ADAPTIVE_VALID_AXIOM_AUDIT=PASS_NO_SORRYAX' \
+            'K19_ADAPTIVE_CHUNKED_FORMAL_GATE=PASS' | tee ../logs/verdict.out
+
+      - name: Upload composed adaptive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-adaptive-composed-evidence-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
