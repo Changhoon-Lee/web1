@@ -48,9 +48,12 @@ theorem normalization_power_cancellation
   have hpow : H ^ gamma * H ^ theta = H := by
     rw [← Real.rpow_add hH, gamma_add_theta]
     simp
-  field_simp [hW.ne']
-  rw [hpow]
-  ring
+  calc
+    (delta / W) * H ^ gamma * (D * W * H ^ theta) =
+        delta * D * (H ^ gamma * H ^ theta) := by
+      field_simp [hW.ne']
+      ring
+    _ = delta * D * H := by rw [hpow]
 
 /-- Capacity forces the exact weighted critical product to be at most two. -/
 theorem weighted_critical_product_le_two
@@ -68,7 +71,7 @@ theorem weighted_critical_product_le_two
       (delta / W) * H ^ gamma * (D * W * H ^ theta) ≤ 2 * H :=
     hscaled.trans (hlower.trans hcapacity)
   rw [normalization_power_cancellation hW hH] at hchain
-  exact (mul_le_mul_right hH).mp (by simpa [mul_assoc] using hchain)
+  nlinarith
 
 /-- Corrected positive Gate B: a lawful weighted antichain whose normalized
 critical density satisfies `delta * D > 2` contradicts the single-cutoff
