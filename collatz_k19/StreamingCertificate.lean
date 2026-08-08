@@ -47,19 +47,20 @@ theorem allFrom_eq_true_iff (predicate : Nat → Bool) (start count : Nat) :
           | zero =>
               simpa using hhead
           | succ offset =>
-              have hoffset' : offset < count := by omega
+              have hoffset' : offset < count :=
+                Nat.lt_of_succ_lt_succ hoffset
               have hvalue :=
                 (ih (start := start + 1)).mp htail offset hoffset'
-              convert hvalue using 1 <;> omega
+              simpa [Nat.succ_eq_add_one, Nat.add_assoc, Nat.add_comm] using hvalue
         · simp [allFrom, hhead] at hcheck
       · intro hall
         have hhead : predicate start = true := by
-          simpa using hall 0 (by omega)
+          simpa using hall 0 (Nat.zero_lt_succ count)
         have htail : allFrom predicate (start + 1) count = true := by
           apply (ih (start := start + 1)).mpr
           intro offset hoffset
-          have hvalue := hall (Nat.succ offset) (by omega)
-          convert hvalue using 1 <;> omega
+          have hvalue := hall (Nat.succ offset) (Nat.succ_lt_succ hoffset)
+          simpa [Nat.succ_eq_add_one, Nat.add_assoc, Nat.add_comm] using hvalue
         simpa [allFrom, hhead] using htail
 
 end NativeRange
@@ -94,6 +95,8 @@ theorem valid_of_streamingCheck {cert : FiniteCertificate}
 end FiniteCertificate
 
 namespace AdaptiveForcedPotentialCertificate
+
+open EliminationResidue
 
 /-- Adaptive-potential row check without materializing
 `List.finRange (principalCount cert.k)`. -/
