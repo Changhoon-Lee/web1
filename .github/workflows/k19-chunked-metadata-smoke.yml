@@ -68,6 +68,8 @@ jobs:
             AdaptiveForcedPotentialCertificate.metadataValid_of_size_and_full_bounds
               (by norm_num) canarySize (by simpa using canaryBoundsFull)
 
+          #print axioms canaryMetadataValidFromIntervals
+
           end KrasikovLagarias
           end Erdos1135
           EOF
@@ -88,15 +90,11 @@ jobs:
           set -euxo pipefail
           lake update
           lake exe cache get
+          lake build Erdos1135.KrasikovLagarias.ChunkedMetadataCertificate \
+            2>&1 | tee ../logs/module_build.out
           lake env lean K19ChunkedMetadataCanary.lean \
-            2>&1 | tee ../logs/build.out
-          cat > K19ChunkedMetadataAxiomAudit.lean <<'EOF'
-          import K19ChunkedMetadataCanary
-          #print axioms Erdos1135.KrasikovLagarias.canaryMetadataValidFromIntervals
-          EOF
-          lake env lean K19ChunkedMetadataAxiomAudit.lean \
-            2>&1 | tee ../logs/axiom_audit.out
-          if grep -q 'sorryAx' ../logs/axiom_audit.out; then exit 5; fi
+            2>&1 | tee ../logs/canary_and_axiom_audit.out
+          if grep -q 'sorryAx' ../logs/canary_and_axiom_audit.out; then exit 5; fi
           if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
               Erdos1135/KrasikovLagarias/ChunkedMetadataCertificate.lean \
               K19ChunkedMetadataCanary.lean; then
