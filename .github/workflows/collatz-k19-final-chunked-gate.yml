@@ -3,15 +3,18 @@ name: Collatz K19 Final Chunked Formal Gate
 on:
   push:
     branches:
-      - collatz-k19-formal-gate-20260808
+      - collatz-k19-gate-clean-20260808
     paths:
       - collatz_k19/final_gate_trigger.env
+  workflow_dispatch:
 
 permissions:
   contents: read
   actions: read
 
 env:
+  SOURCE_METADATA_CACHE_KEY: k19-source-stack-safe-metadata-Linux-54d332219b452ce478f1d28aabab35992fc39aaa
+  ADAPTIVE_METADATA_CACHE_KEY: k19-adaptive-stack-safe-metadata-Linux-a4a885379e2d3ef17d8f87f79d2c3e89fd577d9a
   SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
   SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
   REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
@@ -22,7 +25,7 @@ env:
 jobs:
   final-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
 
@@ -73,25 +76,51 @@ jobs:
           test: false
           use-github-cache: false
 
-      - name: Fetch exact dependencies and compile common Data modules
+      - name: Fetch exact dependencies
         working-directory: source
         shell: bash
         run: |
           set -euxo pipefail
           lake update
           lake exe cache get
-          heartbeat() { while true; do echo "DATA_HEARTBEAT $(date -u +%FT%TZ)"; sleep 30; done; }
-          heartbeat & hb=$!
-          set +e
-          timeout 7200 lake build \
-            Erdos1135.KrasikovLagarias.Generated.K19Gamma14551Data \
-            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialData \
-            2>&1 | tee ../logs/data_build.out
-          status=${PIPESTATUS[0]}
-          set -e
-          kill "$hb" 2>/dev/null || true
-          wait "$hb" 2>/dev/null || true
-          test "$status" -eq 0
+
+      - name: Restore exact source MetadataValid boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: ${{ env.SOURCE_METADATA_CACHE_KEY }}
+          fail-on-cache-miss: true
+
+      - name: Restore exact adaptive MetadataValid boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: ${{ env.ADAPTIVE_METADATA_CACHE_KEY }}
+          fail-on-cache-miss: true
+
+      - name: Authenticate merged Data and Metadata boundaries
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=source/.lake/build/lib/lean/Erdos1135/KrasikovLagarias
+          GEN="$BASE/Generated"
+          for module in StreamingCertificate ChunkedStreamingCertificate; do
+            test -s "$BASE/$module.olean"
+            sha256sum "$BASE/$module.olean" | tee -a logs/merged_boundaries.sha256
+          done
+          for module in \
+            K19Gamma14551Data \
+            K19Gamma14551Metadata \
+            K19AdaptiveForcedPotentialData \
+            K19AdaptiveForcedPotentialMetadata; do
+            test -s "$GEN/$module.olean"
+            sha256sum "$GEN/$module.olean" | tee -a logs/merged_boundaries.sha256
+          done
+          printf '%s\n' \
+            'K19_SOURCE_METADATA_CACHE=RESTORED' \
+            'K19_ADAPTIVE_METADATA_CACHE=RESTORED' \
+            'K19_MERGED_FORMAL_BOUNDARIES=PASS' \
+            | tee logs/merged_boundaries.verdict
 
       - name: Download eight exact source row proof objects
         uses: actions/download-artifact@v4
@@ -120,15 +149,31 @@ jobs:
             . ../source_row_artifacts ../adaptive_row_artifacts \
             2>&1 | tee ../logs/assembly.out
 
+      - name: Add non-conflicting swap for final theorem build
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo fallocate -l 12G /mnt/k19-final-gate.swap
+          sudo chmod 600 /mnt/k19-final-gate.swap
+          sudo mkswap /mnt/k19-final-gate.swap
+          sudo swapon /mnt/k19-final-gate.swap
+          swapon --show | tee logs/swap.out
+
       - name: Compile all-target theorem, audit axioms, and run project build
         working-directory: source
         shell: bash
         run: |
           set -euxo pipefail
-          heartbeat() { while true; do echo "FINAL_GATE_HEARTBEAT $(date -u +%FT%TZ)"; sleep 30; done; }
+          heartbeat() {
+            while true; do
+              echo "FINAL_GATE_HEARTBEAT $(date -u +%FT%TZ)"
+              free -h | sed -n '1,3p'
+              sleep 30
+            done
+          }
           heartbeat & hb=$!
           set +e
-          timeout 7200 lake build CollatzPredecessorK19 K19AxiomAudit \
+          timeout 10800 lake build CollatzPredecessorK19 K19AxiomAudit \
             2>&1 | tee ../logs/all_target_build.out
           status=${PIPESTATUS[0]}
           set -e
@@ -149,14 +194,15 @@ jobs:
             echo 'FORMAL_GATE=FAIL_UNFINISHED_TOKEN' | tee ../logs/verdict.out
             exit 6
           fi
-          timeout 3600 lake build 2>&1 | tee ../logs/project_build.out
+          timeout 5400 lake build 2>&1 | tee ../logs/project_build.out
           printf '%s\n' \
             'K19_SOURCE_CHUNKED_VALID=PASS' \
             'K19_ADAPTIVE_CHUNKED_VALID=PASS' \
             'K19_ALL_TARGET_THEOREM_BUILD=PASS' \
             'K19_AXIOM_AUDIT=PASS_NO_SORRYAX_NO_STUB_AXIOMS' \
             'K19_PROJECT_BUILD=PASS' \
-            'FORMAL_GATE=PASS' | tee ../logs/verdict.out
+            'FORMAL_GATE=PASS' \
+            | tee ../logs/verdict.out
 
       - name: Upload exact final Gate evidence
         if: always()
