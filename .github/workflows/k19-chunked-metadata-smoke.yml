@@ -67,7 +67,7 @@ jobs:
           theorem canaryMetadataValidFromIntervals :
               adaptivePotentialK2Canary.MetadataValid :=
             AdaptiveForcedPotentialCertificate.metadataValid_of_size_and_full_bounds
-              (by norm_num) canarySize (by simpa using canaryBoundsFull)
+              (by native_decide) canarySize (by simpa using canaryBoundsFull)
 
           #print axioms canaryMetadataValidFromIntervals
 
