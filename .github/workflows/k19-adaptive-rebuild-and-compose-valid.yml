@@ -1,0 +1,222 @@
+name: K19 Adaptive Rebuild Boundary and Compose Exact Valid
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/adaptive_compose_trigger.env
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  LEAN_STACK_SIZE_KB: 1572864
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 210
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read exact adaptive row run ID
+        id: run
+        shell: bash
+        run: |
+          set -euxo pipefail
+          source collatz_k19/adaptive_compose_trigger.env
+          [[ "$ADAPTIVE_ROW_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$ADAPTIVE_ROW_RUN_ID" -gt 0 ]]
+          echo "id=$ADAPTIVE_ROW_RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Reconstruct exact payloads and pinned source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers formal_tools source boundary
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Generate exact split adaptive source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd source
+          lake update
+          lake exe cache get
+          cd ..
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/ChunkedStreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean
+          python3 formal_tools/generate_hex_artifacts.py \
+            "$WORK/k19_adaptive_potential.u8" \
+            source/artifacts/kl_predecessor/k19_adaptive_potential \
+            --chunk-bytes 33554432 | tee logs/hex.out
+          python3 collatz_k19/generate_k19_adaptive_chunked.py source --row-chunks 8 \
+            | tee logs/generator.out
+          sha256sum \
+            source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotentialData.lean \
+            source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotentialMetadata.lean \
+            | tee logs/generated_boundaries.sha256
+
+      - name: Add non-conflicting swap
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo fallocate -l 12G /mnt/k19-adaptive-compose.swap
+          sudo chmod 600 /mnt/k19-adaptive-compose.swap
+          sudo mkswap /mnt/k19-adaptive-compose.swap
+          sudo swapon /mnt/k19-adaptive-compose.swap
+          swapon --show | tee logs/swap.out
+
+      - name: Rebuild exact adaptive Data and MetadataValid boundary
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          heartbeat() {
+            while true; do
+              echo "ADAPTIVE_BOUNDARY_REBUILD_HEARTBEAT $(date -u +%FT%TZ)"
+              free -h | sed -n '1,3p'
+              sleep 30
+            done
+          }
+          heartbeat & hb=$!
+          set +e
+          /usr/bin/time -v timeout 10200 lake build \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialMetadata \
+            2>&1 | tee ../logs/metadata_build.out
+          status=${PIPESTATUS[0]}
+          set -e
+          kill "$hb" 2>/dev/null || true
+          wait "$hb" 2>/dev/null || true
+          test "$status" -eq 0
+          grep -q 'Build completed successfully' ../logs/metadata_build.out
+          cat > K19AdaptiveMetadataRebuildAudit.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialMetadata
+          #print axioms Erdos1135.KrasikovLagarias.k19AdaptiveForcedPotentialCertificate_metadataCheck
+          #print axioms Erdos1135.KrasikovLagarias.k19AdaptiveForcedPotentialCertificate_metadataValid
+          EOF
+          lake env lean K19AdaptiveMetadataRebuildAudit.lean \
+            2>&1 | tee ../logs/metadata_axiom_audit.out
+          if grep -q 'sorryAx' ../logs/metadata_axiom_audit.out; then exit 5; fi
+
+      - name: Download all eight exact adaptive row proof objects
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.run.outputs.id }}
+          pattern: k19-adaptive-row-??-${{ steps.run.outputs.id }}
+          path: row_artifacts
+          merge-multiple: true
+
+      - name: Authenticate dependencies and compose public adaptive Valid
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=source/.lake/build/lib/lean/Erdos1135/KrasikovLagarias
+          GEN="$BASE/Generated"
+          check_dep() {
+            local module=$1 directory=$2
+            local actual
+            actual=$(sha256sum "$directory/$module.olean" | awk '{print $1}')
+            mapfile -t files < <(find row_artifacts -name "$module.??.sha256" -type f | sort)
+            test "${#files[@]}" -eq 8
+            for file in "${files[@]}"; do test "$(cat "$file")" = "$actual"; done
+            printf '%s=%s\n' "${module}_OLEAN_SHA256" "$actual" \
+              | tee -a logs/dependencies.sha256
+          }
+          check_dep StreamingCertificate "$BASE"
+          check_dep ChunkedStreamingCertificate "$BASE"
+          check_dep K19AdaptiveForcedPotentialData "$GEN"
+          check_dep K19AdaptiveForcedPotentialMetadata "$GEN"
+          test "$(find row_artifacts -name 'K19AdaptiveForcedPotentialRows??.olean' | wc -l)" -eq 8
+          cp row_artifacts/K19AdaptiveForcedPotentialRows??.olean "$GEN/"
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotentialRows??.lean
+          cd source
+          lake env lean Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.lean \
+            -o .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.olean \
+            -i .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.ilean \
+            2>&1 | tee ../logs/aggregate.out
+          cat > K19AdaptiveExactValidAudit.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotential
+          #print axioms Erdos1135.KrasikovLagarias.k19AdaptiveForcedPotentialCertificate_valid
+          EOF
+          lake env lean K19AdaptiveExactValidAudit.lean \
+            2>&1 | tee ../logs/valid_axiom_audit.out
+          if grep -q 'sorryAx' ../logs/valid_axiom_audit.out; then exit 6; fi
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential*.lean; then
+            exit 7
+          fi
+          printf '%s\n' \
+            'K19_ADAPTIVE_METADATA_REBUILT=PASS' \
+            'K19_ADAPTIVE_EIGHT_INTERVALS_NATIVE=PASS' \
+            'K19_ADAPTIVE_DEPENDENCY_HASH_AUTHENTICATION=PASS' \
+            'K19_ADAPTIVE_INTERVAL_COMPOSITION=PASS' \
+            'K19_ADAPTIVE_VALID_AXIOM_AUDIT=PASS_NO_SORRYAX' \
+            'K19_ADAPTIVE_EXACT_VALID=PASS' \
+            | tee ../logs/verdict.out
+
+      - name: Package exact adaptive Valid boundary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=source/.lake/build/lib/lean/Erdos1135/KrasikovLagarias
+          GEN="$BASE/Generated"
+          mkdir -p boundary/Erdos1135/KrasikovLagarias/Generated
+          cp "$BASE/StreamingCertificate.olean" boundary/Erdos1135/KrasikovLagarias/
+          cp "$BASE/ChunkedStreamingCertificate.olean" boundary/Erdos1135/KrasikovLagarias/
+          cp "$GEN/K19AdaptiveForcedPotentialData.olean" boundary/Erdos1135/KrasikovLagarias/Generated/
+          cp "$GEN/K19AdaptiveForcedPotentialMetadata.olean" boundary/Erdos1135/KrasikovLagarias/Generated/
+          cp "$GEN"/K19AdaptiveForcedPotentialRows??.olean boundary/Erdos1135/KrasikovLagarias/Generated/
+          cp "$GEN/K19AdaptiveForcedPotential.olean" boundary/Erdos1135/KrasikovLagarias/Generated/
+          find boundary -type f -print0 | sort -z | xargs -0 sha256sum \
+            | tee logs/boundary.sha256
+
+      - name: Upload exact adaptive Valid boundary and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-adaptive-exact-valid-boundary-${{ github.run_id }}
+          path: |
+            boundary/
+            logs/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
