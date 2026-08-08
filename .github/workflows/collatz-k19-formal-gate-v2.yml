@@ -1,0 +1,96 @@
+name: Collatz K19 Formal Gate Smoke v2
+
+on:
+  push:
+    branches:
+      - collatz-k19-formal-gate-20260808
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  streaming-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PINNED_COMMIT: 5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f
+      SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+    steps:
+      - name: Checkout isolated gate branch
+        uses: actions/checkout@v4
+
+      - name: Fetch and hash-pin the published source snapshot
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p gate_logs source
+          ARCHIVE="$RUNNER_TEMP/collatz_predecessor_090.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors \
+            "$SOURCE_URL" -o "$ARCHIVE"
+          sha256sum "$ARCHIVE" | tee gate_logs/source_archive_sha256.out
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          rm -f "$ARCHIVE"
+          python3 collatz_k19/verify_pinned_source.py source | tee gate_logs/pinned_source.out
+          printf 'PINNED_COMMIT=%s\n' "$PINNED_COMMIT" | tee gate_logs/pinned_commit.out
+          printf 'LEAN_TOOLCHAIN=' | tee gate_logs/toolchain.out
+          cat source/lean-toolchain | tee -a gate_logs/toolchain.out
+          cat source/lakefile.toml | tee gate_logs/lakefile_original.toml
+          df -h | tee gate_logs/disk_before.out
+          free -h | tee gate_logs/memory_before.out
+
+      - name: Install the source-pinned Lean toolchain
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch pinned Lake dependencies and Mathlib cache
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake --version | tee ../gate_logs/lake_version.out
+          lean --version | tee ../gate_logs/lean_version.out
+          lake update 2>&1 | tee ../gate_logs/lake_update.out
+          lake exe cache get 2>&1 | tee ../gate_logs/mathlib_cache.out
+
+      - name: Register and build the streaming proof root
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/K19StreamingCanary.lean source/K19StreamingCanary.lean
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "K19StreamingCanary"
+          EOF
+          cat source/lakefile.toml | tee gate_logs/lakefile_with_gate.toml
+          cd source
+          timeout 3600 lake build K19StreamingCanary \
+            2>&1 | tee ../gate_logs/streaming_build.out
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              Erdos1135/KrasikovLagarias/StreamingCertificate.lean \
+              K19StreamingCanary.lean; then
+            echo 'FORMAL_GATE_SMOKE=FAIL_UNFINISHED_TOKEN' | tee ../gate_logs/verdict.out
+            exit 4
+          fi
+          echo 'STREAMING_PROOF_COMPILE=PASS' | tee ../gate_logs/verdict.out
+          echo 'NATIVE_CANARY=PASS' | tee -a ../gate_logs/verdict.out
+          echo 'FORMAL_GATE_SMOKE=PASS' | tee -a ../gate_logs/verdict.out
+          df -h | tee ../gate_logs/disk_after.out
+          free -h | tee ../gate_logs/memory_after.out
+
+      - name: Preserve exact logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collatz-k19-formal-gate-smoke-v2-${{ github.run_id }}
+          path: gate_logs/
+          if-no-files-found: error
+          retention-days: 30
