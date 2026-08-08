@@ -1,0 +1,1 @@
+Trigger second K19 formal-gate smoke run after Lake module registration fix.
