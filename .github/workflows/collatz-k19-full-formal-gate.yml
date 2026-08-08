@@ -1,0 +1,224 @@
+name: Collatz K19 Full Formal Gate
+
+on:
+  push:
+    branches:
+      - collatz-k19-formal-gate-20260808
+    paths:
+      - collatz_k19/k19_reproducers.tar.gz.b64
+      - collatz_k19/k19_formal_patch_tools.tar.gz.b64
+      - collatz_k19/StreamingCertificate.lean
+      - collatz_k19/K19StreamingCanary.lean
+      - collatz_k19/verify_pinned_source.py
+      - .github/workflows/collatz-k19-full-formal-gate.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconstruct-and-formalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      PINNED_COMMIT: 5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f
+      SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+      REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+      FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+      WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+      POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+    steps:
+      - name: Checkout isolated K19 gate branch
+        uses: actions/checkout@v4
+
+      - name: Decode and authenticate compact tool bundles
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p full_gate_logs reproducers formal_tools
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check - \
+            | tee full_gate_logs/reproducer_bundle_hash.out
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check - \
+            | tee full_gate_logs/formal_tools_bundle_hash.out
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          find reproducers formal_tools -maxdepth 1 -type f -printf '%p\t%s\n' \
+            | sort | tee full_gate_logs/tool_inventory.tsv
+          df -h | tee full_gate_logs/disk_initial.out
+          free -h | tee full_gate_logs/memory_initial.out
+
+      - name: Deterministically reconstruct and independently verify both K19 assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          WORK="$RUNNER_TEMP/k19_replay"
+          echo "WORK=$WORK" | tee full_gate_logs/reconstruction_paths.out
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee full_gate_logs/reconstruction_driver.out
+          test "$(stat -c %s "$WORK/k19_gamma14551_16000.u32le")" = 1549681956
+          test "$(stat -c %s "$WORK/k19_adaptive_potential.u8")" = 387420489
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check - \
+            | tee full_gate_logs/weight_hash.out
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check - \
+            | tee full_gate_logs/potential_hash.out
+          grep -q '^VERDICT=PASS$' "$WORK/logs/verify_direct.out"
+          grep -q '^VERDICT=PASS$' "$WORK/logs/verify_index.out"
+          grep -q '^VERDICT=PASS$' "$WORK/logs/potential_verify.out"
+          echo 'K19_ASSET_RECONSTRUCTION=PASS' | tee full_gate_logs/asset_verdict.out
+          df -h | tee full_gate_logs/disk_after_reconstruction.out
+          free -h | tee full_gate_logs/memory_after_reconstruction.out
+
+      - name: Fetch and hash-pin the published formal source snapshot
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source
+          ARCHIVE="$RUNNER_TEMP/collatz_predecessor_090.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors \
+            "$SOURCE_URL" -o "$ARCHIVE"
+          sha256sum "$ARCHIVE" | tee full_gate_logs/source_archive_sha256.out
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          rm -f "$ARCHIVE"
+          python3 collatz_k19/verify_pinned_source.py source \
+            | tee full_gate_logs/pinned_source.out
+          printf 'PINNED_COMMIT=%s\n' "$PINNED_COMMIT" \
+            | tee full_gate_logs/pinned_commit.out
+          printf 'LEAN_TOOLCHAIN=' | tee full_gate_logs/toolchain.out
+          cat source/lean-toolchain | tee -a full_gate_logs/toolchain.out
+          cat source/lakefile.toml | tee full_gate_logs/lakefile_original.toml
+          df -h | tee full_gate_logs/disk_after_source.out
+          free -h | tee full_gate_logs/memory_after_source.out
+
+      - name: Install the source-pinned Lean toolchain
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch exact Lake dependencies and Mathlib cache
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake --version | tee ../full_gate_logs/lake_version.out
+          lean --version | tee ../full_gate_logs/lean_version.out
+          lake update 2>&1 | tee ../full_gate_logs/lake_update.out
+          lake exe cache get 2>&1 | tee ../full_gate_logs/mathlib_cache.out
+          df -h | tee ../full_gate_logs/disk_after_mathlib.out
+          free -h | tee ../full_gate_logs/memory_after_mathlib.out
+
+      - name: Generate K19 hex artifacts, wrappers, and reviewed overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/K19StreamingCanary.lean source/K19StreamingCanary.lean
+          python3 formal_tools/generate_k19_generated_wrappers_streaming.py \
+            source \
+            "$WORK/k19_gamma14551_16000.u32le" \
+            "$WORK/k19_adaptive_potential.u8" \
+            --encoder formal_tools/generate_hex_artifacts.py \
+            | tee full_gate_logs/wrapper_generation.out
+          python3 formal_tools/generate_k19_overlay_strict.py source \
+            | tee full_gate_logs/overlay_generation.out
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "K19StreamingCanary"
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+
+          [[lean_lib]]
+          name = "K19AxiomAudit"
+          EOF
+          cat source/lakefile.toml | tee full_gate_logs/lakefile_with_k19.toml
+          find source/artifacts/kl_predecessor/k19_g14551_16000 \
+               source/artifacts/kl_predecessor/k19_adaptive_potential \
+               -type f -printf '%p\t%s\n' | sort \
+            | tee full_gate_logs/k19_hex_chunk_inventory.tsv
+          find source/Erdos1135/KrasikovLagarias -maxdepth 2 \
+               \( -name 'K19*.lean' -o -name 'StreamingCertificate.lean' \) \
+               -type f -print0 \
+            | sort -z | xargs -0 sha256sum \
+            | tee full_gate_logs/generated_lean_sha256.out
+          sha256sum source/CollatzPredecessorK19.lean source/K19AxiomAudit.lean \
+            | tee -a full_gate_logs/generated_lean_sha256.out
+          df -h | tee full_gate_logs/disk_after_hex.out
+          free -h | tee full_gate_logs/memory_after_hex.out
+
+      - name: Compile the full K19 theorem chain and native certificate checks
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd source
+          /usr/bin/time -v timeout 18000 lake build K19StreamingCanary \
+            2>&1 | tee ../full_gate_logs/streaming_recheck.out
+          /usr/bin/time -v timeout 18000 lake build CollatzPredecessorK19 \
+            2>&1 | tee ../full_gate_logs/k19_theorem_build.out
+          /usr/bin/time -v timeout 3600 lake build K19AxiomAudit \
+            2>&1 | tee ../full_gate_logs/k19_axiom_build.out
+          lake env lean K19AxiomAudit.lean \
+            2>&1 | tee ../full_gate_logs/k19_axiom_audit.out
+          mapfile -t NEW_FILES < <(find . -type f \
+            \( -name 'K19*.lean' -o -name 'CollatzPredecessorK19.lean' \
+               -o -name 'StreamingCertificate.lean' \) -print)
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' "${NEW_FILES[@]}"; then
+            echo 'FORMAL_GATE=FAIL_UNFINISHED_TOKEN' | tee ../full_gate_logs/formal_verdict.out
+            exit 4
+          fi
+          if grep -q 'sorryAx' ../full_gate_logs/k19_axiom_audit.out; then
+            echo 'FORMAL_GATE=FAIL_SORRY_AXIOM' | tee ../full_gate_logs/formal_verdict.out
+            exit 5
+          fi
+          grep -q 'CollatzPredecessorK19.predecessor_count_lower_bound_14551_16000' \
+            ../full_gate_logs/k19_axiom_audit.out
+          echo 'K19_SOURCE_NATIVE_CHECK=PASS' | tee ../full_gate_logs/formal_verdict.out
+          echo 'K19_ADAPTIVE_NATIVE_CHECK=PASS' | tee -a ../full_gate_logs/formal_verdict.out
+          echo 'K19_ALL_TARGET_THEOREM_BUILD=PASS' | tee -a ../full_gate_logs/formal_verdict.out
+          echo 'K19_AXIOM_AUDIT=PASS_NO_SORRYAX' | tee -a ../full_gate_logs/formal_verdict.out
+          echo 'FORMAL_GATE=PASS' | tee -a ../full_gate_logs/formal_verdict.out
+          df -h | tee ../full_gate_logs/disk_final.out
+          free -h | tee ../full_gate_logs/memory_final.out
+
+      - name: Collect exact failure or success evidence
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          WORK="$RUNNER_TEMP/k19_replay"
+          mkdir -p full_gate_logs/reconstruction full_gate_logs/generated
+          if test -d "$WORK/logs"; then
+            cp -a "$WORK/logs/." full_gate_logs/reconstruction/
+          fi
+          if test -d source/Erdos1135/KrasikovLagarias/Generated; then
+            cp source/Erdos1135/KrasikovLagarias/Generated/K19*.lean \
+              full_gate_logs/generated/ 2>/dev/null || true
+          fi
+          cp source/Erdos1135/KrasikovLagarias/K19*.lean \
+            full_gate_logs/generated/ 2>/dev/null || true
+          cp source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean \
+            source/CollatzPredecessorK19.lean source/K19AxiomAudit.lean \
+            full_gate_logs/generated/ 2>/dev/null || true
+          printf 'HEAD_SHA=%s\nRUN_ID=%s\nRUN_ATTEMPT=%s\n' \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
+            | tee full_gate_logs/run_identity.out
+          find full_gate_logs -type f -printf '%P\t%s\n' | sort \
+            | tee full_gate_logs/evidence_inventory.tsv
+
+      - name: Upload compact exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collatz-k19-full-formal-gate-${{ github.run_id }}
+          path: full_gate_logs/
+          if-no-files-found: error
+          retention-days: 30
