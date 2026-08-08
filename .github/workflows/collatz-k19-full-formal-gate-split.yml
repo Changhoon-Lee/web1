@@ -1,0 +1,367 @@
+name: Collatz K19 Full Formal Gate Split
+
+on:
+  push:
+    branches:
+      - collatz-k19-formal-gate-20260808
+    paths:
+      - collatz_k19/k19_reproducers.tar.gz.b64
+      - collatz_k19/k19_formal_patch_tools.tar.gz.b64
+      - collatz_k19/StreamingCertificate.lean
+      - collatz_k19/K19StreamingCanary.lean
+      - collatz_k19/verify_pinned_source.py
+      - .github/workflows/collatz-k19-full-formal-gate-split.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: collatz-k19-formal-split-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PINNED_COMMIT: 5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+
+jobs:
+  adaptive-native:
+    name: adaptive-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact assets and pin source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p gate_logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee gate_logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee gate_logs/pinned_source.out
+
+      - name: Install pinned Lean toolchain
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch exact dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+
+      - name: Generate identical K19 source tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/K19StreamingCanary.lean source/K19StreamingCanary.lean
+          python3 formal_tools/generate_k19_generated_wrappers_streaming.py \
+            source "$WORK/k19_gamma14551_16000.u32le" \
+            "$WORK/k19_adaptive_potential.u8" \
+            --encoder formal_tools/generate_hex_artifacts.py \
+            | tee gate_logs/wrappers.out
+          python3 formal_tools/generate_k19_overlay_strict.py source \
+            | tee gate_logs/overlay.out
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "K19StreamingCanary"
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+
+          [[lean_lib]]
+          name = "K19AxiomAudit"
+          EOF
+
+      - name: Compile adaptive native certificate
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v timeout 8400 lake build K19StreamingCanary \
+            2>&1 | tee ../gate_logs/streaming.out
+          /usr/bin/time -v timeout 8400 lake build \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotential \
+            2>&1 | tee ../gate_logs/adaptive.out
+          grep -q 'Build completed successfully' ../gate_logs/adaptive.out
+          find .lake/build -path '*Generated/K19AdaptiveForcedPotential*' \
+            -type f -printf '%p\t%s\n' | sort | tee ../gate_logs/adaptive_build_files.tsv
+
+      - name: Save adaptive build state
+        uses: actions/cache/save@v5
+        with:
+          path: source/.lake/build
+          key: k19-adaptive-${{ runner.os }}-${{ github.sha }}
+
+      - name: Upload adaptive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-adaptive-evidence-${{ github.run_id }}
+          path: gate_logs/
+          if-no-files-found: error
+          retention-days: 30
+
+  source-native:
+    name: source-native
+    needs: adaptive-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact assets and pin source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p gate_logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee gate_logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee gate_logs/pinned_source.out
+
+      - name: Install pinned Lean toolchain
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch exact dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+
+      - name: Generate identical K19 source tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/K19StreamingCanary.lean source/K19StreamingCanary.lean
+          python3 formal_tools/generate_k19_generated_wrappers_streaming.py \
+            source "$WORK/k19_gamma14551_16000.u32le" \
+            "$WORK/k19_adaptive_potential.u8" \
+            --encoder formal_tools/generate_hex_artifacts.py \
+            | tee gate_logs/wrappers.out
+          python3 formal_tools/generate_k19_overlay_strict.py source \
+            | tee gate_logs/overlay.out
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "K19StreamingCanary"
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+
+          [[lean_lib]]
+          name = "K19AxiomAudit"
+          EOF
+
+      - name: Restore adaptive build state
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: k19-adaptive-${{ runner.os }}-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Compile source native certificate
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v timeout 8400 lake build \
+            Erdos1135.KrasikovLagarias.Generated.K19Gamma14551 \
+            2>&1 | tee ../gate_logs/source.out
+          grep -q 'Build completed successfully' ../gate_logs/source.out
+          find .lake/build -path '*Generated/K19*' -type f -printf '%p\t%s\n' \
+            | sort | tee ../gate_logs/generated_build_files.tsv
+
+      - name: Save both native build states
+        uses: actions/cache/save@v5
+        with:
+          path: source/.lake/build
+          key: k19-both-${{ runner.os }}-${{ github.sha }}
+
+      - name: Upload source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-source-evidence-${{ github.run_id }}
+          path: gate_logs/
+          if-no-files-found: error
+          retention-days: 30
+
+  theorem-and-audit:
+    name: theorem-and-audit
+    needs: source-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact assets and pin source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p gate_logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee gate_logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee gate_logs/pinned_source.out
+
+      - name: Install pinned Lean toolchain
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch exact dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+
+      - name: Generate identical K19 source tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/K19StreamingCanary.lean source/K19StreamingCanary.lean
+          python3 formal_tools/generate_k19_generated_wrappers_streaming.py \
+            source "$WORK/k19_gamma14551_16000.u32le" \
+            "$WORK/k19_adaptive_potential.u8" \
+            --encoder formal_tools/generate_hex_artifacts.py \
+            | tee gate_logs/wrappers.out
+          python3 formal_tools/generate_k19_overlay_strict.py source \
+            | tee gate_logs/overlay.out
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "K19StreamingCanary"
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+
+          [[lean_lib]]
+          name = "K19AxiomAudit"
+          EOF
+
+      - name: Restore both native build states
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: k19-both-${{ runner.os }}-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Compile theorem, audit axioms, and run clean build
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v timeout 6600 lake build CollatzPredecessorK19 \
+            2>&1 | tee ../gate_logs/theorem.out
+          /usr/bin/time -v timeout 3600 lake build K19AxiomAudit \
+            2>&1 | tee ../gate_logs/axiom_build.out
+          lake env lean K19AxiomAudit.lean 2>&1 | tee ../gate_logs/axiom_audit.out
+          /usr/bin/time -v timeout 3600 lake build \
+            2>&1 | tee ../gate_logs/clean_build.out
+          mapfile -t NEW_FILES < <(find . -type f \
+            \( -name 'K19*.lean' -o -name 'CollatzPredecessorK19.lean' \
+               -o -name 'StreamingCertificate.lean' \) -print)
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' "${NEW_FILES[@]}"; then
+            echo 'FORMAL_GATE=FAIL_UNFINISHED_TOKEN' | tee ../gate_logs/verdict.out
+            exit 4
+          fi
+          if grep -q 'sorryAx' ../gate_logs/axiom_audit.out; then
+            echo 'FORMAL_GATE=FAIL_SORRY_AXIOM' | tee ../gate_logs/verdict.out
+            exit 5
+          fi
+          grep -q 'CollatzPredecessorK19.predecessor_count_lower_bound_14551_16000' \
+            ../gate_logs/axiom_audit.out
+          printf '%s\n' \
+            'K19_SOURCE_NATIVE_CHECK=PASS' \
+            'K19_ADAPTIVE_NATIVE_CHECK=PASS' \
+            'K19_ALL_TARGET_THEOREM_BUILD=PASS' \
+            'K19_AXIOM_AUDIT=PASS_NO_SORRYAX' \
+            'K19_CLEAN_BUILD=PASS' \
+            'FORMAL_GATE=PASS' | tee ../gate_logs/verdict.out
+
+      - name: Upload final evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-final-evidence-${{ github.run_id }}
+          path: gate_logs/
+          if-no-files-found: error
+          retention-days: 30
