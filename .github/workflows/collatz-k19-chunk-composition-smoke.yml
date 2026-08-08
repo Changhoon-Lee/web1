@@ -1,0 +1,100 @@
+name: Collatz K19 Chunk Composition Smoke
+
+on:
+  push:
+    branches:
+      - collatz-k19-formal-gate-20260808
+    paths:
+      - collatz_k19/ChunkedStreamingCertificate.lean
+      - .github/workflows/collatz-k19-chunk-composition-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chunk-composition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+      SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch pinned source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs source
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/ChunkedStreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean
+          cat > source/K19ChunkCompositionCanary.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.ChunkedStreamingCertificate
+
+          namespace Erdos1135
+          namespace KrasikovLagarias
+
+          private def p (index : Nat) : Bool := decide (index < 100000)
+
+          private theorem firstHalf :
+              NativeRange.allFrom p 0 50000 = true := by
+            native_decide
+
+          private theorem secondHalf :
+              NativeRange.allFrom p 50000 50000 = true := by
+            native_decide
+
+          theorem combinedWithoutReevaluation :
+              NativeRange.allFrom p 0 100000 = true := by
+            simpa using NativeRange.allFrom_append p 0 50000 50000
+              firstHalf secondHalf
+
+          end KrasikovLagarias
+          end Erdos1135
+          EOF
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "K19ChunkCompositionCanary"
+          EOF
+
+      - name: Install pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Compile exact composition theorem and canary
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+          lake build K19ChunkCompositionCanary 2>&1 | tee ../logs/build.out
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean \
+              K19ChunkCompositionCanary.lean; then
+            exit 4
+          fi
+          echo 'K19_CHUNK_COMPOSITION_FORMAL=PASS' | tee ../logs/verdict.out
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-chunk-composition-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
