@@ -1,0 +1,262 @@
+name: K19 Source Valid Composition and Final All-Target Gate
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/source_final_trigger.env
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  LEAN_STACK_SIZE_KB: 1572864
+  SOURCE_METADATA_CACHE_KEY: k19-source-split-metadata-Linux-352f2f8dbecff8ed81b2cc986ee8e97c39b772e6
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  final-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read exact source-row and adaptive-Valid run IDs
+        id: runs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          source collatz_k19/source_final_trigger.env
+          [[ "$SOURCE_ROW_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$ADAPTIVE_VALID_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$SOURCE_ROW_RUN_ID" -gt 0 ]]
+          [[ "$ADAPTIVE_VALID_RUN_ID" -gt 0 ]]
+          echo "source=$SOURCE_ROW_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "adaptive=$ADAPTIVE_VALID_RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Reconstruct and hash-authenticate exact K19 assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers formal_tools source adaptive_boundary
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py collatz_k19/*.sh
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+          collatz_k19/prepare_k19_exact_chunked_tree.sh source formal_tools "$WORK" \
+            | tee logs/exact_tree.out
+          sha256sum \
+            source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Data.lean \
+            source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Metadata.lean \
+            source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotentialData.lean \
+            source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotentialMetadata.lean \
+            | tee logs/generated_boundaries.sha256
+
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch exact pinned dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+
+      - name: Restore exact compiled source Data and MetadataValid boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: ${{ env.SOURCE_METADATA_CACHE_KEY }}
+          fail-on-cache-miss: true
+
+      - name: Download all eight exact source row proof objects
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.runs.outputs.source }}
+          pattern: k19-source-row-??-${{ steps.runs.outputs.source }}
+          path: source_row_artifacts
+          merge-multiple: true
+
+      - name: Authenticate source dependencies and compose public source Valid
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=source/.lake/build/lib/lean/Erdos1135/KrasikovLagarias
+          GEN="$BASE/Generated"
+          check_dep() {
+            local module=$1 directory=$2
+            local actual
+            actual=$(sha256sum "$directory/$module.olean" | awk '{print $1}')
+            mapfile -t files < <(find source_row_artifacts -name "$module.??.sha256" -type f | sort)
+            test "${#files[@]}" -eq 8
+            for file in "${files[@]}"; do test "$(cat "$file")" = "$actual"; done
+            printf '%s=%s\n' "${module}_OLEAN_SHA256" "$actual" \
+              | tee -a logs/source_dependencies.sha256
+          }
+          check_dep StreamingCertificate "$BASE"
+          check_dep ChunkedStreamingCertificate "$BASE"
+          check_dep K19Gamma14551Data "$GEN"
+          check_dep K19Gamma14551Metadata "$GEN"
+          test "$(find source_row_artifacts -name 'K19Gamma14551Rows??.olean' | wc -l)" -eq 8
+          cp source_row_artifacts/K19Gamma14551Rows??.olean "$GEN/"
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Rows??.lean
+          cd source
+          lake env lean Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.lean \
+            -o .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.olean \
+            -i .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.ilean \
+            2>&1 | tee ../logs/source_aggregate.out
+          cat > K19SourceExactAxiomAudit.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.Generated.K19Gamma14551
+          #print axioms Erdos1135.KrasikovLagarias.k19Gamma14551EncodedCertificate_valid
+          #print axioms Erdos1135.KrasikovLagarias.k19Gamma14551EncodedCertificate_realRowValid
+          EOF
+          lake env lean K19SourceExactAxiomAudit.lean \
+            2>&1 | tee ../logs/source_axiom_audit.out
+          if grep -q 'sorryAx' ../logs/source_axiom_audit.out; then exit 5; fi
+          printf '%s\n' \
+            'K19_SOURCE_EIGHT_INTERVALS_NATIVE=PASS' \
+            'K19_SOURCE_DEPENDENCY_HASH_AUTHENTICATION=PASS' \
+            'K19_SOURCE_INTERVAL_COMPOSITION=PASS' \
+            'K19_SOURCE_VALID_AXIOM_AUDIT=PASS_NO_SORRYAX' \
+            'K19_SOURCE_EXACT_VALID=PASS' \
+            | tee ../logs/source_valid.verdict
+
+      - name: Download axiom-audited adaptive Valid boundary
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.runs.outputs.adaptive }}
+          name: k19-adaptive-exact-valid-boundary-${{ steps.runs.outputs.adaptive }}
+          path: adaptive_boundary
+
+      - name: Verify and install adaptive Valid boundary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f adaptive_boundary/logs/boundary.sha256
+          (
+            cd adaptive_boundary
+            sha256sum --check logs/boundary.sha256
+          ) | tee logs/adaptive_boundary_verify.out
+          DEST=source/.lake/build/lib/lean
+          BASE="$DEST/Erdos1135/KrasikovLagarias"
+          GEN="$BASE/Generated"
+          for module in StreamingCertificate ChunkedStreamingCertificate; do
+            current=$(sha256sum "$BASE/$module.olean" | awk '{print $1}')
+            supplied=$(sha256sum \
+              "adaptive_boundary/boundary/Erdos1135/KrasikovLagarias/$module.olean" \
+              | awk '{print $1}')
+            test "$current" = "$supplied"
+          done
+          cp -a adaptive_boundary/boundary/. "$DEST/"
+          test -s "$GEN/K19AdaptiveForcedPotential.olean"
+          printf '%s\n' \
+            'K19_ADAPTIVE_VALID_BOUNDARY_MANIFEST=PASS' \
+            'K19_COMMON_STREAMING_DEPENDENCIES_IDENTICAL=PASS' \
+            'K19_ADAPTIVE_EXACT_VALID=PASS' \
+            | tee logs/adaptive_boundary.verdict
+
+      - name: Freeze authenticated expensive generated modules as binary imports
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Data.lean
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Metadata.lean
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Rows??.lean
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.lean
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotentialData.lean
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotentialMetadata.lean
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotentialRows??.lean
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.lean
+          echo 'K19_EXPENSIVE_GENERATED_MODULES=AUTHENTICATED_BINARY_IMPORTS' \
+            | tee logs/frozen_boundaries.verdict
+
+      - name: Add non-conflicting swap for final implication build
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo fallocate -l 12G /mnt/k19-source-final.swap
+          sudo chmod 600 /mnt/k19-source-final.swap
+          sudo mkswap /mnt/k19-source-final.swap
+          sudo swapon /mnt/k19-source-final.swap
+          swapon --show | tee logs/swap.out
+
+      - name: Compile all seven bridges, publication theorem, and axiom audit
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake build \
+            Erdos1135.KrasikovLagarias.K19PowerOfTwoTargets \
+            Erdos1135.KrasikovLagarias.K19PrincipalIndex \
+            Erdos1135.KrasikovLagarias.K19CoefficientBridge \
+            Erdos1135.KrasikovLagarias.K19SourceBridge \
+            Erdos1135.KrasikovLagarias.K19CriticalChoice \
+            2>&1 | tee ../logs/bridge_stage1.out
+          grep -q 'Build completed successfully' ../logs/bridge_stage1.out
+          lake build \
+            Erdos1135.KrasikovLagarias.K19PredecessorBridge \
+            Erdos1135.KrasikovLagarias.K19PredecessorAllTargets \
+            2>&1 | tee ../logs/bridge_stage2.out
+          grep -q 'Build completed successfully' ../logs/bridge_stage2.out
+          lake build CollatzPredecessorK19 K19AxiomAudit \
+            2>&1 | tee ../logs/all_target_build.out
+          grep -q 'Build completed successfully' ../logs/all_target_build.out
+          lake env lean K19AxiomAudit.lean 2>&1 | tee ../logs/final_axiom_audit.out
+          if grep -qE 'sorryAx|k19Gamma14551EncodedCertificate_valid|k19AdaptiveForcedPotentialCertificate_valid' \
+              ../logs/final_axiom_audit.out; then
+            echo 'FORMAL_GATE=FAIL_AXIOM_AUDIT' | tee ../logs/verdict.out
+            exit 6
+          fi
+          mapfile -t K19_FILES < <(find . -type f \
+            \( -name 'K19*.lean' -o -name 'CollatzPredecessorK19.lean' \) -print)
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' "${K19_FILES[@]}"; then
+            echo 'FORMAL_GATE=FAIL_UNFINISHED_TOKEN' | tee ../logs/verdict.out
+            exit 7
+          fi
+          printf '%s\n' \
+            'K19_SOURCE_CHUNKED_VALID=PASS' \
+            'K19_ADAPTIVE_CHUNKED_VALID=PASS' \
+            'K19_ALL_SEVEN_BRIDGES_BUILD=PASS' \
+            'K19_ALL_TARGET_THEOREM_BUILD=PASS' \
+            'K19_AXIOM_AUDIT=PASS_NO_SORRYAX_NO_STUB_AXIOMS' \
+            'FORMAL_GATE=PASS' \
+            | tee ../logs/verdict.out
+
+      - name: Upload exact final Gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-source-compose-final-gate-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
