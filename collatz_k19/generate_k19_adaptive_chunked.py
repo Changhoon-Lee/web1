@@ -2,7 +2,7 @@
 """Generate a K19 adaptive-potential wrapper split at two exact boundaries.
 
 The payload text is split into one Lean module per hexadecimal file so that no
-single elaboration unit contains the complete 774 MB textual payload.  Row
+single elaboration unit contains the complete 774 MB textual payload. Row
 validity is independently split into consecutive native-decidable intervals.
 Both decompositions are recombined inside Lean without changing the public
 `AdaptiveForcedPotentialCertificate.Valid` proposition.
@@ -104,9 +104,17 @@ theorem k19AdaptiveForcedPotentialEncodingValid :
       {TOTAL} = true := by
   native_decide
 
-theorem k19AdaptiveForcedPotentialCertificate_metadataValid :
-    k19AdaptiveForcedPotentialCertificate.MetadataValid := by
+/-- Stack-safe executable metadata verification. The public source defines
+`metadataCheck` with `Array.all` specifically to avoid the proposition-level
+`Fintype` decision procedure over hundreds of millions of entries. -/
+theorem k19AdaptiveForcedPotentialCertificate_metadataCheck :
+    k19AdaptiveForcedPotentialCertificate.metadataCheck = true := by
   native_decide
+
+theorem k19AdaptiveForcedPotentialCertificate_metadataValid :
+    k19AdaptiveForcedPotentialCertificate.MetadataValid :=
+  (k19AdaptiveForcedPotentialCertificate.metadataCheck_eq_true_iff).mp
+    k19AdaptiveForcedPotentialCertificate_metadataCheck
 
 end KrasikovLagarias
 end Erdos1135
