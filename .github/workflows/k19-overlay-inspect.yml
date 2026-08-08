@@ -1,0 +1,41 @@
+name: K19 Strict All-Target Overlay Inspection
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - .github/workflows/k19-overlay-inspect.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and print strict overlay generator
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs tools
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 \
+            > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C tools
+          find tools -maxdepth 2 -type f -print | sort | tee logs/files.txt
+          sed -n '1,320p' tools/generate_k19_overlay_strict.py \
+            | tee logs/generate_k19_overlay_strict.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: k19-strict-overlay-source-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
