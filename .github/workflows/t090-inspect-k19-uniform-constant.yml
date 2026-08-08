@@ -1,4 +1,4 @@
-name: T090 Inspect K19 Uniform Constant
+name: T090 Inspect K19 Weighted Route
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate reviewed K19 overlay and extract constant normalization
+      - name: Generate reviewed K19 overlay and extract weighted-route structure
         shell: bash
         run: |
           set -euxo pipefail
@@ -40,16 +40,18 @@ jobs:
           chmod +x formal_tools/*.py formal_tools/*.sh
           python3 formal_tools/generate_k19_overlay_strict.py source \
             | tee logs/overlay.out
-          grep -R -n -C 80 -E \
-            'theorem exponential_lower_bound|let constant|coefficientSum|principalCount|phiValues19_exponential_lower_bound|gamma14551|lambda14551' \
-            source --include='*.lean' > logs/theorem-neighborhood.txt || true
-          grep -R -n -E \
-            'def principalCount|principalCount 19|principalCount :=|principalCount=' \
-            source --include='*.lean' > logs/principal-count.txt || true
+          grep -R -n -C 100 -E \
+            'exists_uniform_shiftBounds_of_terminalsRetarded|TerminalsRetarded|ShiftBounds|fullTree|theorem exponential_lower_bound|let constant|coefficientSum|principalCount' \
+            source/Erdos1135/KrasikovLagarias --include='*.lean' \
+            > logs/weighted-route-neighborhood.txt || true
           printf '%s\n' \
             source/Erdos1135/KrasikovLagarias/AdaptiveCriticalChoice.lean \
+            source/Erdos1135/KrasikovLagarias/AdaptiveEliminationTree.lean \
+            source/Erdos1135/KrasikovLagarias/EliminationCriticalTree.lean \
+            source/Erdos1135/KrasikovLagarias/EliminationUniformShiftBounds.lean \
+            source/Erdos1135/KrasikovLagarias/Retarded.lean \
+            source/Erdos1135/KrasikovLagarias/RetardedChoice.lean \
             source/Erdos1135/KrasikovLagarias/EliminationResidue.lean \
-            source/Erdos1135/KrasikovLagarias/FiniteCertificate.lean \
             source/Erdos1135/KrasikovLagarias/K19CoefficientBridge.lean \
             source/Erdos1135/KrasikovLagarias/K19CriticalChoice.lean \
             source/Erdos1135/KrasikovLagarias/K19PredecessorBridge.lean \
@@ -60,16 +62,12 @@ jobs:
             mkdir -p "logs/files/$(dirname "$rel")"
             cp "$file" "logs/files/$rel"
           done < logs/matching-files.txt
-          find formal_tools -maxdepth 2 -type f -print0 | sort -z \
-            | xargs -0 grep -n -H -E \
-              'theorem exponential_lower_bound|let constant|coefficientSum|principalCount|gamma14551|lambda14551' \
-              > logs/generator-neighborhood.txt || true
           find logs -type f -print0 | sort -z | xargs -0 sha256sum > logs/sha256.txt
 
       - name: Upload source inspection evidence
         uses: actions/upload-artifact@v4
         with:
-          name: t090-k19-uniform-constant-${{ github.run_id }}
+          name: t090-k19-weighted-route-${{ github.run_id }}
           path: logs/
           if-no-files-found: error
           retention-days: 30
