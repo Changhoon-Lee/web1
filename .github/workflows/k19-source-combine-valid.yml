@@ -1,0 +1,170 @@
+name: K19 Source Compose Exact Valid
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/source_combine_trigger.env
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  LEAN_STACK_SIZE_KB: 1572864
+  METADATA_CACHE_KEY: k19-source-split-metadata-Linux-352f2f8dbecff8ed81b2cc986ee8e97c39b772e6
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  combine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read exact source row run ID
+        id: run
+        shell: bash
+        run: |
+          set -euxo pipefail
+          source collatz_k19/source_combine_trigger.env
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$SOURCE_RUN_ID" -gt 0 ]]
+          echo "id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Reconstruct exact source certificate tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
+
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Generate byte-identical source modules
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd source
+          lake update
+          lake exe cache get
+          cd ..
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/ChunkedStreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean
+          python3 formal_tools/generate_hex_artifacts.py \
+            "$WORK/k19_gamma14551_16000.u32le" \
+            source/artifacts/kl_predecessor/k19_g14551_16000 \
+            --chunk-bytes 33554432 | tee logs/hex.out
+          python3 collatz_k19/generate_k19_source_chunked.py source --row-chunks 8 \
+            | tee logs/generator.out
+
+      - name: Restore exact source MetadataValid boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: ${{ env.METADATA_CACHE_KEY }}
+          fail-on-cache-miss: true
+
+      - name: Download eight exact source row proof objects
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.run.outputs.id }}
+          pattern: k19-source-row-??-${{ steps.run.outputs.id }}
+          path: row_artifacts
+          merge-multiple: true
+
+      - name: Authenticate dependencies and compose public source Valid
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=source/.lake/build/lib/lean/Erdos1135/KrasikovLagarias
+          GEN="$BASE/Generated"
+          check_dep() {
+            local module=$1 directory=$2
+            local actual
+            actual=$(sha256sum "$directory/$module.olean" | awk '{print $1}')
+            mapfile -t files < <(find row_artifacts -name "$module.??.sha256" -type f | sort)
+            test "${#files[@]}" -eq 8
+            for file in "${files[@]}"; do test "$(cat "$file")" = "$actual"; done
+            printf '%s=%s\n' "${module}_OLEAN_SHA256" "$actual" \
+              | tee -a logs/dependencies.sha256
+          }
+          check_dep StreamingCertificate "$BASE"
+          check_dep ChunkedStreamingCertificate "$BASE"
+          check_dep K19Gamma14551Data "$GEN"
+          check_dep K19Gamma14551Metadata "$GEN"
+          test "$(find row_artifacts -name 'K19Gamma14551Rows??.olean' | wc -l)" -eq 8
+          cp row_artifacts/K19Gamma14551Rows??.olean "$GEN/"
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551Rows??.lean
+          cd source
+          lake env lean Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.lean \
+            -o .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.olean \
+            -i .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.ilean \
+            2>&1 | tee ../logs/aggregate.out
+          cat > K19SourceExactAxiomAudit.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.Generated.K19Gamma14551
+          #print axioms Erdos1135.KrasikovLagarias.k19Gamma14551EncodedCertificate_valid
+          #print axioms Erdos1135.KrasikovLagarias.k19Gamma14551EncodedCertificate_realRowValid
+          EOF
+          lake env lean K19SourceExactAxiomAudit.lean \
+            2>&1 | tee ../logs/axiom_audit.out
+          if grep -q 'sorryAx' ../logs/axiom_audit.out; then exit 5; fi
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              Erdos1135/KrasikovLagarias/Generated/K19Gamma14551*.lean; then
+            exit 6
+          fi
+          printf '%s\n' \
+            'K19_SOURCE_EIGHT_INTERVALS_NATIVE=PASS' \
+            'K19_SOURCE_INTERVAL_COMPOSITION=PASS' \
+            'K19_SOURCE_VALID_AXIOM_AUDIT=PASS_NO_SORRYAX' \
+            'K19_SOURCE_EXACT_VALID=PASS' \
+            | tee ../logs/verdict.out
+
+      - name: Save exact source Valid boundary
+        uses: actions/cache/save@v5
+        with:
+          path: source/.lake/build
+          key: k19-source-exact-valid-${{ runner.os }}-${{ github.sha }}
+
+      - name: Upload composed source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-source-composed-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
