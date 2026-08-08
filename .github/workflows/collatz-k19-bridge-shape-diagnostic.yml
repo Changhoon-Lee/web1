@@ -1,0 +1,106 @@
+name: Collatz K19 Bridge Shape Diagnostic
+
+on:
+  push:
+    branches:
+      - collatz-k19-formal-gate-20260808
+    paths:
+      - .github/workflows/collatz-k19-bridge-shape-diagnostic.yml
+      - collatz_k19/k19_formal_patch_tools.tar.gz.b64
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bridge-shape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+      FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned source and generate K19 bridge overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source diagnostic
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$RUNNER_TEMP/source.tar.gz"
+          tar -xzf "$RUNNER_TEMP/source.tar.gz" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source | tee diagnostic/pinned_source.out
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          mkdir formal_tools
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          python3 formal_tools/generate_k19_overlay_strict.py source | tee diagnostic/overlay.out
+          mkdir -p source/Erdos1135/KrasikovLagarias/Generated
+          cat > source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.RealCertificate
+          namespace Erdos1135
+          namespace KrasikovLagarias
+          /- DIAGNOSTIC STUB ONLY.  These axioms are forbidden in the full gate. -/
+          def k19Gamma14551EncodedCertificate : FiniteCertificate where
+            k := 19
+            gammaNum := 14551
+            gammaDen := 16000
+            coefficients := {
+              scale := 281474976710656
+              lambdaNeg2 := 79781805157054
+              lambdaAlphaMinus2 := 216678499581515
+              lambdaAlphaMinus1 := 406990044804623
+            }
+            weights := #[]
+          axiom k19Gamma14551EncodedCertificate_valid :
+            k19Gamma14551EncodedCertificate.Valid
+          theorem k19Gamma14551EncodedCertificate_realRowValid {index : Nat}
+              (hindex : index < k19Gamma14551EncodedCertificate.principalCount) :
+              k19Gamma14551EncodedCertificate.RealRowValid
+                (realCoefficients k19Gamma14551EncodedCertificate.gammaNum
+                  k19Gamma14551EncodedCertificate.gammaDen) index :=
+            k19Gamma14551EncodedCertificate_valid.klRealRowValid hindex
+          end KrasikovLagarias
+          end Erdos1135
+          EOF
+          cat > source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.AdaptiveForcedPotentialCertificate
+          namespace Erdos1135
+          namespace KrasikovLagarias
+          /- DIAGNOSTIC STUB ONLY.  This axiom is forbidden in the full gate. -/
+          axiom k19AdaptiveForcedPotential :
+            AdaptiveEliminationPolicy.ForcedPotential 19 (by norm_num)
+          end KrasikovLagarias
+          end Erdos1135
+          EOF
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "CollatzPredecessorK19"
+          EOF
+          grep -RInE '(^|[^[:alnum:]_])(axiom|sorry|admit)([^[:alnum:]_]|$)' \
+            source/Erdos1135/KrasikovLagarias/Generated/K19*.lean \
+            | tee diagnostic/expected_stub_axioms.out
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+      - name: Compile all non-payload K19 bridges against diagnostic interfaces
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update 2>&1 | tee ../diagnostic/lake_update.out
+          lake exe cache get 2>&1 | tee ../diagnostic/cache.out
+          lake build CollatzPredecessorK19 2>&1 | tee ../diagnostic/bridge_build.out
+          echo 'BRIDGE_SHAPE_DIAGNOSTIC=PASS' | tee ../diagnostic/verdict.out
+          echo 'THIS_IS_NOT_A_PROOF=TRUE' | tee -a ../diagnostic/verdict.out
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collatz-k19-bridge-shape-diagnostic-${{ github.run_id }}
+          path: diagnostic/
+          if-no-files-found: error
+          retention-days: 30
