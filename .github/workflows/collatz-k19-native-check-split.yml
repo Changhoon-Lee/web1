@@ -1,0 +1,136 @@
+name: Collatz K19 Split Native Checks
+
+on:
+  push:
+    branches:
+      - collatz-k19-formal-gate-20260808
+    paths:
+      - .github/workflows/collatz-k19-native-check-split.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-check:
+    name: native-${{ matrix.check }}
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [source, potential]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+      REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+      FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+      WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+      POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decode authenticated tools and reconstruct exact K19 assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence reproducers formal_tools
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum -c -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.py
+          /usr/bin/time -v reproducers/reproduce_all.sh "$RUNNER_TEMP/k19_replay" 4 \
+            2>&1 | tee evidence/reconstruction.out
+          echo "$WEIGHT_SHA256  $RUNNER_TEMP/k19_replay/k19_gamma14551_16000.u32le" | sha256sum -c - \
+            | tee evidence/weight_hash.out
+          echo "$POTENTIAL_SHA256  $RUNNER_TEMP/k19_replay/k19_adaptive_potential.u8" | sha256sum -c - \
+            | tee evidence/potential_hash.out
+          cp "$RUNNER_TEMP/k19_replay/logs/verify_direct.out" evidence/
+          cp "$RUNNER_TEMP/k19_replay/logs/verify_index.out" evidence/
+          cp "$RUNNER_TEMP/k19_replay/logs/potential_verify.out" evidence/
+          grep -q '^VERDICT=PASS$' evidence/verify_direct.out
+          grep -q '^VERDICT=PASS$' evidence/verify_index.out
+          grep -q '^VERDICT=PASS$' evidence/potential_verify.out
+
+      - name: Fetch and pin formal source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir source
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$RUNNER_TEMP/source.tar.gz"
+          tar -xzf "$RUNNER_TEMP/source.tar.gz" -C source --strip-components=1
+          rm -f "$RUNNER_TEMP/source.tar.gz"
+          python3 collatz_k19/verify_pinned_source.py source | tee evidence/pinned_source.out
+
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch exact Lake dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update 2>&1 | tee ../evidence/lake_update.out
+          lake exe cache get 2>&1 | tee ../evidence/mathlib_cache.out
+          lean --version | tee ../evidence/lean_version.out
+
+      - name: Generate both exact wrappers
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp collatz_k19/StreamingCertificate.lean source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          python3 formal_tools/generate_k19_generated_wrappers_streaming.py \
+            source \
+            "$RUNNER_TEMP/k19_replay/k19_gamma14551_16000.u32le" \
+            "$RUNNER_TEMP/k19_replay/k19_adaptive_potential.u8" \
+            --encoder formal_tools/generate_hex_artifacts.py \
+            | tee evidence/wrapper_generation.out
+          if [[ '${{ matrix.check }}' == 'source' ]]; then
+            cat > source/K19NativeCheckOnly.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.Generated.K19Gamma14551
+          #print axioms Erdos1135.KrasikovLagarias.k19Gamma14551EncodedCertificate_valid
+          EOF
+          else
+            cat > source/K19NativeCheckOnly.lean <<'EOF'
+          import Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotential
+          #print axioms Erdos1135.KrasikovLagarias.k19AdaptiveForcedPotential
+          EOF
+          fi
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "K19NativeCheckOnly"
+          EOF
+          find source/artifacts/kl_predecessor -maxdepth 2 -type f -printf '%p\t%s\n' | sort \
+            | tee evidence/chunks.tsv
+
+      - name: Execute one full K19 native check
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v timeout 20000 lake build K19NativeCheckOnly \
+            2>&1 | tee ../evidence/native_build.out
+          lake env lean K19NativeCheckOnly.lean 2>&1 | tee ../evidence/axioms.out
+          if grep -q 'sorryAx' ../evidence/axioms.out; then
+            echo 'NATIVE_CHECK=FAIL_SORRY_AXIOM' | tee ../evidence/verdict.out
+            exit 4
+          fi
+          echo 'CHECK=${{ matrix.check }}' | tee ../evidence/verdict.out
+          echo 'NATIVE_CHECK=PASS' | tee -a ../evidence/verdict.out
+
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collatz-k19-native-${{ matrix.check }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
