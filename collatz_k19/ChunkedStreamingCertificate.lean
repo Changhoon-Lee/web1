@@ -4,10 +4,10 @@ import Mathlib.Tactic
 /-!
 # Exact interval composition for large native certificate checks
 
-This module permits a finite-certificate row check to be split into consecutive
-intervals. Each interval can be discharged by a separate `native_decide`.
-The interval proofs are then recombined in Lean into the unchanged
-`FiniteCertificate.Valid` proposition.
+This module permits finite-certificate and adaptive-potential row checks to be
+split into consecutive intervals. Each interval can be discharged by a separate
+`native_decide`. The interval proofs are then recombined in Lean into the
+unchanged public `Valid` propositions.
 -/
 
 namespace Erdos1135
@@ -85,6 +85,52 @@ theorem valid_of_metadata_and_full_range {cert : FiniteCertificate}
   simpa using hvalue
 
 end FiniteCertificate
+
+namespace AdaptiveForcedPotentialCertificate
+
+open EliminationResidue
+
+/-- Check one consecutive raw-index interval of adaptive-potential rows. -/
+def rowsCheckRange (cert : AdaptiveForcedPotentialCertificate)
+    (hmetadata : cert.MetadataValid) (start count : Nat) : Bool :=
+  NativeRange.allFrom
+    (fun rawIndex =>
+      if hindex : rawIndex < principalCount cert.k then
+        decide (cert.RowValid hmetadata ⟨rawIndex, hindex⟩)
+      else
+        false)
+    start count
+
+/-- Consecutive adaptive-potential intervals compose exactly. -/
+theorem rowsCheckRange_append (cert : AdaptiveForcedPotentialCertificate)
+    (hmetadata : cert.MetadataValid) (start left right : Nat)
+    (hleft : cert.rowsCheckRange hmetadata start left = true)
+    (hright : cert.rowsCheckRange hmetadata (start + left) right = true) :
+    cert.rowsCheckRange hmetadata start (left + right) = true :=
+  NativeRange.allFrom_append _ _ _ _ hleft hright
+
+/-- Metadata plus a full raw-index interval proof yields the unchanged public
+`AdaptiveForcedPotentialCertificate.Valid` proposition. -/
+theorem valid_of_metadata_and_full_range
+    {cert : AdaptiveForcedPotentialCertificate}
+    (hmetadata : cert.MetadataValid)
+    (hrows : cert.rowsCheckRange hmetadata 0 (principalCount cert.k) = true) :
+    cert.Valid := by
+  refine ⟨hmetadata, ?_⟩
+  intro index
+  unfold rowsCheckRange at hrows
+  have hall :=
+    (NativeRange.allFrom_eq_true_iff
+      (fun rawIndex =>
+        if hindex : rawIndex < principalCount cert.k then
+          decide (cert.RowValid hmetadata ⟨rawIndex, hindex⟩)
+        else
+          false)
+      0 (principalCount cert.k)).mp hrows
+  have hvalue := hall index.val index.isLt
+  simpa [index.isLt] using hvalue
+
+end AdaptiveForcedPotentialCertificate
 
 end KrasikovLagarias
 end Erdos1135
