@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - collatz-k19-formal-gate-20260808
+    paths:
+      - collatz_k19/StreamingCertificate.lean
+      - collatz_k19/K19StreamingCanary.lean
+      - collatz_k19/verify_pinned_source.py
+      - .github/workflows/collatz-k19-formal-gate-v2.yml
   workflow_dispatch:
 
 permissions:
