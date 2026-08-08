@@ -67,6 +67,54 @@ theorem allFrom_eq_true_iff (predicate : Nat → Bool) (start count : Nat) :
           exact harg.symm ▸ hvalue
         simpa [allFrom, hhead] using htail
 
+/-- Two successful adjacent range checks compose into one successful check.
+This permits large native certificates to be checkpointed into independently
+replayable consecutive pieces without changing the checked predicate. -/
+theorem allFrom_append_of_true (predicate : Nat → Bool)
+    (start firstCount secondCount : Nat)
+    (hfirst : allFrom predicate start firstCount = true)
+    (hsecond : allFrom predicate (start + firstCount) secondCount = true) :
+    allFrom predicate start (firstCount + secondCount) = true := by
+  apply (allFrom_eq_true_iff predicate start (firstCount + secondCount)).mpr
+  intro offset hoffset
+  by_cases hleft : offset < firstCount
+  · exact (allFrom_eq_true_iff predicate start firstCount).mp
+      hfirst offset hleft
+  · have hge : firstCount ≤ offset := Nat.le_of_not_gt hleft
+    have hright : offset - firstCount < secondCount := by omega
+    have hvalue :=
+      (allFrom_eq_true_iff predicate (start + firstCount) secondCount).mp
+        hsecond (offset - firstCount) hright
+    have harg :
+        (start + firstCount) + (offset - firstCount) = start + offset := by
+      omega
+    exact harg ▸ hvalue
+
+/-- Exact bidirectional decomposition of a consecutive range at a chosen
+checkpoint. -/
+theorem allFrom_append_eq_true_iff (predicate : Nat → Bool)
+    (start firstCount secondCount : Nat) :
+    allFrom predicate start (firstCount + secondCount) = true ↔
+      allFrom predicate start firstCount = true ∧
+        allFrom predicate (start + firstCount) secondCount = true := by
+  constructor
+  · intro hall
+    have hmeaning :=
+      (allFrom_eq_true_iff predicate start (firstCount + secondCount)).mp hall
+    constructor
+    · apply (allFrom_eq_true_iff predicate start firstCount).mpr
+      intro offset hoffset
+      exact hmeaning offset (by omega)
+    · apply (allFrom_eq_true_iff predicate (start + firstCount) secondCount).mpr
+      intro offset hoffset
+      have hvalue := hmeaning (firstCount + offset) (by omega)
+      have harg : start + (firstCount + offset) =
+          (start + firstCount) + offset := by omega
+      exact harg ▸ hvalue
+  · rintro ⟨hfirst, hsecond⟩
+    exact allFrom_append_of_true predicate start firstCount secondCount
+      hfirst hsecond
+
 end NativeRange
 
 namespace FiniteCertificate
