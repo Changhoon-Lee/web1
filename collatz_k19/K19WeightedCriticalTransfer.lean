@@ -52,13 +52,12 @@ theorem normalization_power_cancellation
     (delta / W) * H ^ gamma * (D * W * H ^ theta) =
         delta * D * (H ^ gamma * H ^ theta) := by
       field_simp [hW.ne']
-      ring
     _ = delta * D * H := by rw [hpow]
 
 /-- Capacity forces the exact weighted critical product to be at most two. -/
 theorem weighted_critical_product_le_two
     {delta W H D M total : ℝ}
-    (hdelta : 0 ≤ delta) (hW : 0 < W) (hH : 0 < H) (hD : 0 ≤ D)
+    (hdelta : 0 ≤ delta) (hW : 0 < W) (hH : 0 < H)
     (hoccupancy : D * W * H ^ theta ≤ M)
     (hlower : (delta / W) * H ^ gamma * M ≤ total)
     (hcapacity : total ≤ 2 * H) :
@@ -78,12 +77,12 @@ critical density satisfies `delta * D > 2` contradicts the single-cutoff
 capacity bound. -/
 theorem contradiction_of_weighted_critical_overflow
     {delta W H D M total : ℝ}
-    (hdelta : 0 ≤ delta) (hW : 0 < W) (hH : 0 < H) (hD : 0 ≤ D)
+    (hdelta : 0 ≤ delta) (hW : 0 < W) (hH : 0 < H)
     (hoccupancy : D * W * H ^ theta ≤ M)
     (hlower : (delta / W) * H ^ gamma * M ≤ total)
     (hcapacity : total ≤ 2 * H)
     (hoverflow : 2 < delta * D) : False := by
-  have hceiling := weighted_critical_product_le_two hdelta hW hH hD
+  have hceiling := weighted_critical_product_le_two hdelta hW hH
     hoccupancy hlower hcapacity
   linarith
 
