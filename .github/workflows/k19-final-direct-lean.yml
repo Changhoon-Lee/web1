@@ -221,6 +221,7 @@ jobs:
             Erdos1135.KrasikovLagarias.K19PowerOfTwoTargets \
             Erdos1135.KrasikovLagarias.K19PrincipalIndex \
             Erdos1135.KrasikovLagarias.K19SourceBridge \
+            Erdos1135.KrasikovLagarias.PeriodicTargetReduction \
             Erdos1135.KrasikovLagarias.AdaptiveCriticalChoice \
             Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk00 \
             Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk01 \
@@ -238,10 +239,12 @@ jobs:
           grep -q 'Build completed successfully' ../logs/noncertificate_dependencies.out
           test "$(find .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated \
             -name 'K19AdaptiveForcedPotentialHexChunk??.olean' | wc -l)" -eq 12
+          test -s .lake/build/lib/lean/Erdos1135/KrasikovLagarias/PeriodicTargetReduction.olean
           printf '%s\n' \
             'K19_POWER_TARGETS_PREBUILT=PASS' \
             'K19_PRINCIPAL_INDEX_PREBUILT=PASS' \
             'K19_SOURCE_BRIDGE_PREBUILT=PASS' \
+            'K19_PERIODIC_TARGET_REDUCTION_PREBUILT=PASS' \
             'K19_ADAPTIVE_CRITICAL_CHOICE_PREBUILT=PASS' \
             'K19_ADAPTIVE_HEX_CHUNKS_PREBUILT=PASS' \
             | tee ../logs/noncertificate_dependencies.verdict
