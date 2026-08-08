@@ -25,13 +25,17 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p gate_logs source
+          ARCHIVE="$RUNNER_TEMP/collatz_predecessor_090.tar.gz"
           curl --fail --location --retry 5 --retry-all-errors \
-            "$SOURCE_URL" -o gate_logs/source.tar.gz
-          tar -xzf gate_logs/source.tar.gz -C source --strip-components=1
+            "$SOURCE_URL" -o "$ARCHIVE"
+          sha256sum "$ARCHIVE" | tee gate_logs/source_archive_sha256.out
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          rm -f "$ARCHIVE"
           python3 collatz_k19/verify_pinned_source.py source | tee gate_logs/pinned_source.out
           printf 'PINNED_COMMIT=%s\n' "$PINNED_COMMIT" | tee gate_logs/pinned_commit.out
           printf 'LEAN_TOOLCHAIN=' | tee gate_logs/toolchain.out
           cat source/lean-toolchain | tee -a gate_logs/toolchain.out
+          cat source/lakefile.toml | tee gate_logs/lakefile_original.toml
           df -h | tee gate_logs/disk_before.out
           free -h | tee gate_logs/memory_before.out
 
@@ -61,12 +65,15 @@ jobs:
           cp collatz_k19/StreamingCertificate.lean \
             source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
           cp collatz_k19/K19StreamingCanary.lean source/K19StreamingCanary.lean
+          cat >> source/lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "K19StreamingCanary"
+          EOF
+          cat source/lakefile.toml | tee gate_logs/lakefile_with_gate.toml
           cd source
-          timeout 3600 lake env lean \
-            Erdos1135/KrasikovLagarias/StreamingCertificate.lean \
-            2>&1 | tee ../gate_logs/streaming_compile.out
-          timeout 1800 lake env lean K19StreamingCanary.lean \
-            2>&1 | tee ../gate_logs/canary_compile.out
+          timeout 3600 lake build K19StreamingCanary \
+            2>&1 | tee ../gate_logs/streaming_build.out
           if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
               Erdos1135/KrasikovLagarias/StreamingCertificate.lean \
               K19StreamingCanary.lean; then
