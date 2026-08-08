@@ -44,13 +44,12 @@ jobs:
           base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
           echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
           tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
-          chmod +x formal_tools/*.py formal_tools/*.sh
+          chmod +x formal_tools/*.py formal_tools/*.sh collatz_k19/prepare_k19_structural_stub_tree.sh
           ARCHIVE="$RUNNER_TEMP/source.tar.gz"
           curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
           echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
           tar -xzf "$ARCHIVE" -C source --strip-components=1
           python3 collatz_k19/verify_pinned_source.py source | tee logs/pinned_source.out
-          mkdir -p source/Erdos1135/KrasikovLagarias/Generated
 
       - name: Install pinned Lean
         uses: leanprover/lean-action@v1
@@ -73,58 +72,29 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cat > source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.lean <<'EOF'
-          import Erdos1135.KrasikovLagarias.RealCertificate
-          namespace Erdos1135
-          namespace KrasikovLagarias
-          def k19Gamma14551EncodedCertificate : FiniteCertificate where
-            k := 19
-            gammaNum := 14551
-            gammaDen := 16000
-            coefficients := {
-              scale := 281474976710656
-              lambdaNeg2 := 79781805157054
-              lambdaAlphaMinus2 := 216678499581515
-              lambdaAlphaMinus1 := 406990044804623
-            }
-            weights := #[]
-          axiom k19Gamma14551EncodedCertificate_valid :
-            k19Gamma14551EncodedCertificate.Valid
-          theorem k19Gamma14551EncodedCertificate_realRowValid {index : Nat}
-              (hindex : index < k19Gamma14551EncodedCertificate.principalCount) :
-              k19Gamma14551EncodedCertificate.RealRowValid
-                (realCoefficients k19Gamma14551EncodedCertificate.gammaNum
-                  k19Gamma14551EncodedCertificate.gammaDen) index :=
-            k19Gamma14551EncodedCertificate_valid.klRealRowValid hindex
-          end KrasikovLagarias
-          end Erdos1135
-          EOF
-          cat > source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.lean <<'EOF'
-          import Erdos1135.KrasikovLagarias.AdaptiveForcedPotentialCertificate
-          namespace Erdos1135
-          namespace KrasikovLagarias
-          def k19AdaptiveForcedPotentialCertificate :
-              AdaptiveForcedPotentialCertificate where
-            k := 19
-            bound := 36
-            values := #[]
-          axiom k19AdaptiveForcedPotentialCertificate_valid :
-            k19AdaptiveForcedPotentialCertificate.Valid
-          noncomputable def k19AdaptiveForcedPotential :
-              AdaptiveEliminationPolicy.ForcedPotential 19 (by norm_num) :=
-            k19AdaptiveForcedPotentialCertificate_valid.toForcedPotential
-          end KrasikovLagarias
-          end Erdos1135
-          EOF
-          python3 formal_tools/generate_k19_overlay_strict.py source | tee logs/overlay.out
+          collatz_k19/prepare_k19_structural_stub_tree.sh source formal_tools \
+            | tee logs/overlay.out
 
-      - name: Compile selected K19 bridge module
+      - name: Compile selected K19 bridge module with heartbeat
         working-directory: source
         shell: bash
         run: |
           set -euxo pipefail
+          heartbeat() {
+            while true; do
+              echo "K19_${{ matrix.short }}_HEARTBEAT $(date -u +%FT%TZ)"
+              sleep 30
+            done
+          }
+          heartbeat & hb=$!
+          set +e
           /usr/bin/time -v timeout 4800 lake build '${{ matrix.target }}' \
             2>&1 | tee '../logs/${{ matrix.short }}.out'
+          status=${PIPESTATUS[0]}
+          set -e
+          kill "$hb" 2>/dev/null || true
+          wait "$hb" 2>/dev/null || true
+          test "$status" -eq 0
           grep -q 'Build completed successfully' '../logs/${{ matrix.short }}.out'
           echo 'K19_BRIDGE_MODULE_${{ matrix.short }}=PASS_WITH_DECLARED_STUB_AXIOMS' \
             | tee '../logs/${{ matrix.short }}.verdict'
