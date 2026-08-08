@@ -417,7 +417,11 @@ theorem one_step_exists (y : Fin 243) (hy : y.val % 3 ≠ 0) :
       2 * e + phi x ≤ 3 + phi (y.val % 81) := by
   refine ⟨policyE y.val, policyX y.val, ?_⟩
   have h := finite_policy_valid y
-  simpa [policyGoodBool, hy] using h
+  simp [policyGoodBool, hy] at h
+  rcases h with ⟨hABC, hD⟩
+  rcases hABC with ⟨hAB, hC⟩
+  rcases hAB with ⟨hA, hB⟩
+  exact ⟨hA, hB, hC, hD⟩
 
 /-- The potential is globally bounded by `10` on residues modulo `81`. -/
 theorem phi_le_ten : ∀ x : Fin 81, phi x.val ≤ 10 := by
