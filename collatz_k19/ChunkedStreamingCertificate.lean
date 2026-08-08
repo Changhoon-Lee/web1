@@ -32,7 +32,18 @@ theorem allFrom_append (predicate : Nat → Bool) (start left right : Nat)
     have hresidualLt : offset - left < right :=
       (Nat.sub_lt_iff_lt_add' hleftLe).2 hoffset
     have hvalue := hrightMeaning (offset - left) hresidualLt
-    convert hvalue using 1 <;> omega
+    have hsum : left + (offset - left) = offset := by
+      calc
+        left + (offset - left) = (offset - left) + left := Nat.add_comm _ _
+        _ = offset := Nat.sub_add_cancel hleftLe
+    have hindex : (start + left) + (offset - left) = start + offset := by
+      calc
+        (start + left) + (offset - left) =
+            start + (left + (offset - left)) := by
+              rw [Nat.add_assoc]
+        _ = start + offset := by rw [hsum]
+    rw [hindex] at hvalue
+    exact hvalue
 
 end NativeRange
 
