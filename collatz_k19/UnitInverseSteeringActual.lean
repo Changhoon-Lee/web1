@@ -45,8 +45,8 @@ theorem actual_one_step_exists {y : Nat}
     simpa [hzmod3] using hxunit
   have hxne : x ≠ 0 := by
     intro hx
-    subst x
-    simp at hxunit
+    apply hxunit
+    simpa [hx]
   have hzpos : 0 < z := by
     have hxpos : 0 < x := Nat.pos_of_ne_zero hxne
     dsimp [z]
