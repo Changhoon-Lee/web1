@@ -51,7 +51,9 @@ theorem allFrom_eq_true_iff (predicate : Nat → Bool) (start count : Nat) :
                 Nat.lt_of_succ_lt_succ hoffset
               have hvalue :=
                 (ih (start := start + 1)).mp htail offset hoffset'
-              simpa [Nat.succ_eq_add_one, Nat.add_assoc, Nat.add_comm] using hvalue
+              have harg : (start + 1) + offset = start + Nat.succ offset := by
+                simp [Nat.succ_eq_add_one, Nat.add_assoc, Nat.add_comm 1 offset]
+              exact harg ▸ hvalue
         · simp [allFrom, hhead] at hcheck
       · intro hall
         have hhead : predicate start = true := by
@@ -60,7 +62,9 @@ theorem allFrom_eq_true_iff (predicate : Nat → Bool) (start count : Nat) :
           apply (ih (start := start + 1)).mpr
           intro offset hoffset
           have hvalue := hall (Nat.succ offset) (Nat.succ_lt_succ hoffset)
-          simpa [Nat.succ_eq_add_one, Nat.add_assoc, Nat.add_comm] using hvalue
+          have harg : (start + 1) + offset = start + Nat.succ offset := by
+            simp [Nat.succ_eq_add_one, Nat.add_assoc, Nat.add_comm 1 offset]
+          exact harg.symm ▸ hvalue
         simpa [allFrom, hhead] using htail
 
 end NativeRange
@@ -120,9 +124,10 @@ theorem rowsCheckStreaming_eq_true_iff
   constructor
   · intro hall index
     have hvalue := hall index.val index.isLt
-    simpa [index.isLt] using hvalue
+    simpa only [dif_pos index.isLt, decide_eq_true_eq] using hvalue
   · intro hall rawIndex hindex
-    simp [hindex, hall ⟨rawIndex, hindex⟩]
+    simp only [dif_pos hindex, decide_eq_true_eq]
+    exact hall ⟨rawIndex, hindex⟩
 
 /-- Full adaptive-potential check with the same dependent metadata proof and
 `Valid` proposition as the pinned public checker. -/
