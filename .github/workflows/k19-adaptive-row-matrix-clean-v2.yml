@@ -1,0 +1,182 @@
+name: K19 Adaptive Row Matrix Clean v2
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/adaptive_rows_v2_trigger.env
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k19-adaptive-row-matrix-clean-v2
+  cancel-in-progress: false
+
+env:
+  LEAN_STACK_SIZE_KB: 1572864
+  METADATA_CACHE_KEY: k19-adaptive-split-metadata-Linux-bdf162b56f8268b6b2d89c24ec6afc98ac2933ba
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  row:
+    name: adaptive-row-${{ matrix.idx }}
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          - idx: '00'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows00
+          - idx: '01'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows01
+          - idx: '02'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows02
+          - idx: '03'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows03
+          - idx: '04'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows04
+          - idx: '05'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows05
+          - idx: '06'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows06
+          - idx: '07'
+            module: Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialRows07
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct and authenticate exact assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers formal_tools source
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.sh formal_tools/*.py
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee 'logs/reconstruction.${{ matrix.idx }}.out'
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check -
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" | sha256sum --check -
+          ARCHIVE="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$ARCHIVE"
+          echo "$SOURCE_ARCHIVE_SHA256  $ARCHIVE" | sha256sum --check -
+          tar -xzf "$ARCHIVE" -C source --strip-components=1
+          python3 collatz_k19/verify_pinned_source.py source \
+            | tee 'logs/pinned_source.${{ matrix.idx }}.out'
+
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Generate byte-identical split adaptive source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd source
+          lake update
+          lake exe cache get
+          cd ..
+          WORK="$RUNNER_TEMP/k19_replay"
+          cp collatz_k19/StreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/StreamingCertificate.lean
+          cp collatz_k19/ChunkedStreamingCertificate.lean \
+            source/Erdos1135/KrasikovLagarias/ChunkedStreamingCertificate.lean
+          python3 formal_tools/generate_hex_artifacts.py \
+            "$WORK/k19_adaptive_potential.u8" \
+            source/artifacts/kl_predecessor/k19_adaptive_potential \
+            --chunk-bytes 33554432 | tee 'logs/hex.${{ matrix.idx }}.out'
+          python3 collatz_k19/generate_k19_adaptive_chunked.py source --row-chunks 8 \
+            | tee 'logs/generator.${{ matrix.idx }}.out'
+
+      - name: Restore exact compiled metadata boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: ${{ env.METADATA_CACHE_KEY }}
+          fail-on-cache-miss: true
+
+      - name: Add interval-specific swap
+        shell: bash
+        run: |
+          set -euxo pipefail
+          SWAP=/mnt/k19-adaptive-row-${{ matrix.idx }}.swap
+          sudo fallocate -l 12G "$SWAP"
+          sudo chmod 600 "$SWAP"
+          sudo mkswap "$SWAP"
+          sudo swapon "$SWAP"
+          swapon --show | tee 'logs/swap.${{ matrix.idx }}.out'
+
+      - name: Prove exact consecutive adaptive interval
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          heartbeat() {
+            while true; do
+              echo "ADAPTIVE_ROW_${{ matrix.idx }}_HEARTBEAT $(date -u +%FT%TZ)"
+              free -h | sed -n '1,3p'
+              sleep 30
+            done
+          }
+          heartbeat & hb=$!
+          set +e
+          /usr/bin/time -v timeout 9600 lake build '${{ matrix.module }}' \
+            2>&1 | tee '../logs/row.${{ matrix.idx }}.out'
+          status=${PIPESTATUS[0]}
+          set -e
+          kill "$hb" 2>/dev/null || true
+          wait "$hb" 2>/dev/null || true
+          test "$status" -eq 0
+          grep -q 'Build completed successfully' '../logs/row.${{ matrix.idx }}.out'
+          BASE=.lake/build/lib/lean/Erdos1135/KrasikovLagarias
+          GEN="$BASE/Generated"
+          mkdir -p ../proof_object
+          cp "$GEN/K19AdaptiveForcedPotentialRows${{ matrix.idx }}.olean" ../proof_object/
+          for dep in StreamingCertificate ChunkedStreamingCertificate; do
+            sha256sum "$BASE/$dep.olean" | awk '{print $1}' \
+              > "../proof_object/$dep.${{ matrix.idx }}.sha256"
+          done
+          for dep in K19AdaptiveForcedPotentialData K19AdaptiveForcedPotentialMetadata; do
+            sha256sum "$GEN/$dep.olean" | awk '{print $1}' \
+              > "../proof_object/$dep.${{ matrix.idx }}.sha256"
+          done
+          printf 'K19_ADAPTIVE_ROW_%s_NATIVE=PASS\n' '${{ matrix.idx }}' \
+            | tee '../logs/row.${{ matrix.idx }}.verdict'
+
+      - name: Upload exact proof object
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-adaptive-row-proof-${{ matrix.idx }}-${{ github.run_id }}
+          path: proof_object/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-adaptive-row-evidence-${{ matrix.idx }}-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
