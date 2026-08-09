@@ -1,0 +1,86 @@
+name: K19 Exact Boundary Count Probe
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/k19_boundary_count_probe.cpp
+      - .github/workflows/k19-boundary-count-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  exact-boundary-count:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install exact probe dependency
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libboost-dev
+
+      - name: Reconstruct and authenticate exact K19 payloads
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 \
+            > "$RUNNER_TEMP/reproducers.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          chmod +x reproducers/*.sh
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" \
+            | sha256sum --check - | tee logs/weight-hash.out
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" \
+            | sha256sum --check - | tee logs/potential-hash.out
+          echo "WEIGHT_FILE=$WORK/k19_gamma14551_16000.u32le" >> "$GITHUB_ENV"
+          echo "POTENTIAL_FILE=$WORK/k19_adaptive_potential.u8" >> "$GITHUB_ENV"
+
+      - name: Compile exact capped boundary-count probe
+        shell: bash
+        run: |
+          set -euxo pipefail
+          g++ -O3 -std=c++20 -Wall -Wextra -Wpedantic \
+            collatz_k19/k19_boundary_count_probe.cpp \
+            -o "$RUNNER_TEMP/k19_boundary_count_probe"
+          sha256sum collatz_k19/k19_boundary_count_probe.cpp \
+            "$RUNNER_TEMP/k19_boundary_count_probe" \
+            | tee logs/probe.sha256
+
+      - name: Evaluate high-weight residues and boundary normal forms
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v "$RUNNER_TEMP/k19_boundary_count_probe" \
+            "$WEIGHT_FILE" "$POTENTIAL_FILE" \
+            2>&1 | tee logs/boundary-count.txt
+          grep -q '^N=387420489$' logs/boundary-count.txt
+          grep -q '^GLOBAL_MAX_WEIGHT=' logs/boundary-count.txt
+          grep -q '^MIN_TOP512_FACTOR=' logs/boundary-count.txt
+          sha256sum logs/* | tee logs/manifest.sha256
+
+      - name: Upload exact boundary-count evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-boundary-count-probe-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 6
