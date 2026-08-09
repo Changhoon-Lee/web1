@@ -1,0 +1,182 @@
+name: K19 Exact Row Slack Audit
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - .github/workflows/k19-exact-row-slack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+
+jobs:
+  exact-row-slack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct and authenticate the exact K19 weight payload
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 \
+            > "$RUNNER_TEMP/reproducers.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          chmod +x reproducers/*.sh
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" \
+            | sha256sum --check - | tee logs/weight-hash.out
+          echo "WEIGHT_FILE=$WORK/k19_gamma14551_16000.u32le" \
+            >> "$GITHUB_ENV"
+
+      - name: Compile the exact integer row-slack scanner
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat > "$RUNNER_TEMP/k19_row_slack.cpp" <<'CPP'
+          #include <algorithm>
+          #include <array>
+          #include <cstdint>
+          #include <cstring>
+          #include <fcntl.h>
+          #include <iomanip>
+          #include <iostream>
+          #include <limits>
+          #include <string>
+          #include <sys/mman.h>
+          #include <sys/stat.h>
+          #include <unistd.h>
+
+          using u128 = unsigned __int128;
+          static constexpr uint64_t N = 387420489ULL;       // 3^18
+          static constexpr uint64_t A = 129140163ULL;       // 3^17
+          static constexpr uint64_t SCALE = 281474976710656ULL; // 2^48
+          static constexpr uint64_t C0 = 79781805157054ULL;
+          static constexpr uint64_t C1 = 216678499581515ULL;
+          static constexpr uint64_t C3 = 406990044804623ULL;
+
+          static std::string s128(u128 x) {
+            if (x == 0) return "0";
+            std::string s;
+            while (x) { s.push_back(char('0' + x % 10)); x /= 10; }
+            std::reverse(s.begin(), s.end());
+            return s;
+          }
+
+          static uint32_t read_u32(const unsigned char* p) {
+            uint32_t v;
+            std::memcpy(&v, p, sizeof(v));
+          #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            v = __builtin_bswap32(v);
+          #endif
+            return v;
+          }
+
+          struct Map {
+            int fd=-1; size_t bytes=0; const unsigned char* data=nullptr;
+            explicit Map(const char* path) {
+              fd=open(path,O_RDONLY); if(fd<0) throw std::runtime_error("open");
+              struct stat st{}; if(fstat(fd,&st)) throw std::runtime_error("stat");
+              bytes=size_t(st.st_size);
+              data=(const unsigned char*)mmap(nullptr,bytes,PROT_READ,MAP_PRIVATE,fd,0);
+              if(data==MAP_FAILED) throw std::runtime_error("mmap");
+            }
+            ~Map(){if(data&&data!=MAP_FAILED)munmap((void*)data,bytes);if(fd>=0)close(fd);}
+          };
+
+          static uint32_t w(const unsigned char* p, uint32_t i) {
+            return read_u32(p + 4ULL*i);
+          }
+          static uint32_t principal(uint32_t i) {
+            return uint32_t((4ULL*i + 2ULL) % N);
+          }
+          static std::array<uint32_t,3> d1(uint32_t i) {
+            uint64_t base=(4ULL*i+2ULL)%N;
+            uint64_t q=(base-2ULL)/3ULL;
+            return {uint32_t(q),uint32_t(q+A),uint32_t(q+2*A)};
+          }
+          static std::array<uint32_t,3> d3(uint32_t i) {
+            uint64_t base=(2ULL*i+1ULL)%N;
+            uint64_t q=(base-2ULL)/3ULL;
+            return {uint32_t(q),uint32_t(q+A),uint32_t(q+2*A)};
+          }
+
+          struct Best {
+            u128 slack=~u128(0); uint32_t index=0; uint32_t lhsw=0;
+            u128 rhs=0; long double ratio=std::numeric_limits<long double>::infinity();
+            uint64_t equality=0; uint64_t count=0;
+          };
+
+          int main(int argc,char**argv){
+            if(argc!=2){std::cerr<<"usage: scan WEIGHTS\n";return 2;}
+            Map m(argv[1]); if(m.bytes!=4ULL*N){std::cerr<<"bad size\n";return 3;}
+            Best all; std::array<Best,3> byrow;
+            for(uint32_t i=0;i<N;++i){
+              uint32_t wi=w(m.data,i);
+              uint32_t wp=w(m.data,principal(i));
+              u128 rhs=u128(C0)*wp;
+              unsigned row=i%3U;
+              if(row==0U){auto c=d1(i);uint32_t mn=std::min({w(m.data,c[0]),w(m.data,c[1]),w(m.data,c[2])});rhs+=u128(C1)*mn;}
+              else if(row==2U){auto c=d3(i);uint32_t mn=std::min({w(m.data,c[0]),w(m.data,c[1]),w(m.data,c[2])});rhs+=u128(C3)*mn;}
+              u128 lhs=u128(SCALE)*wi;
+              if(rhs<lhs){std::cerr<<"INVALID_ROW="<<i<<"\n";return 4;}
+              u128 slack=rhs-lhs;
+              long double ratio=(long double)rhs/(long double)lhs;
+              auto update=[&](Best& b){
+                ++b.count; if(slack==0)++b.equality;
+                if(slack<b.slack || (slack==b.slack && i<b.index)){
+                  b.slack=slack;b.index=i;b.lhsw=wi;b.rhs=rhs;
+                }
+                if(ratio<b.ratio)b.ratio=ratio;
+              };
+              update(all);update(byrow[row]);
+            }
+            std::cout<<std::setprecision(24);
+            auto print=[&](const std::string& prefix,const Best& b){
+              std::cout<<prefix<<"COUNT="<<b.count<<"\n";
+              std::cout<<prefix<<"EQUALITY_COUNT="<<b.equality<<"\n";
+              std::cout<<prefix<<"MIN_SLACK="<<s128(b.slack)<<"\n";
+              std::cout<<prefix<<"MIN_SLACK_INDEX="<<b.index<<"\n";
+              std::cout<<prefix<<"MIN_SLACK_WEIGHT="<<b.lhsw<<"\n";
+              std::cout<<prefix<<"MIN_SLACK_RHS="<<s128(b.rhs)<<"\n";
+              std::cout<<prefix<<"MIN_RATIO_DIAGNOSTIC="<<b.ratio<<"\n";
+            };
+            print("",all);
+            for(unsigned r=0;r<3;++r)print("ROW"+std::to_string(r)+"_",byrow[r]);
+            std::cout<<"UNIFORM_STRICT_SLACK="<<(all.slack>0?"PASS_POSITIVE":"FAIL_TIGHT")<<"\n";
+            return 0;
+          }
+          CPP
+          g++ -O3 -std=c++20 "$RUNNER_TEMP/k19_row_slack.cpp" \
+            -o "$RUNNER_TEMP/k19_row_slack"
+
+      - name: Run all-row exact audit
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v "$RUNNER_TEMP/k19_row_slack" "$WEIGHT_FILE" \
+            2>&1 | tee logs/row-slack.txt
+          grep -q '^COUNT=387420489$' logs/row-slack.txt
+          grep -q '^UNIFORM_STRICT_SLACK=' logs/row-slack.txt
+          sha256sum logs/* | tee logs/manifest.sha256
+
+      - name: Upload exact row-slack evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-exact-row-slack-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
