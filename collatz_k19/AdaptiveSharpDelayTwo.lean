@@ -4,9 +4,9 @@ import Erdos1135.KrasikovLagarias.AdaptiveCriticalChoice
 # Exact delay two for adaptive KL normal forms
 
 Every adaptive normalizer expands only a node whose current shift is
-nonnegative.  The three legal child increments are `-2`, `alpha - 2`, and
-`alpha - 1`, with `alpha > 0`.  Hence every child of an expanded node has
-shift at least `-2`.  Starting from the root shift `0`, every terminal in every
+nonnegative. The three legal child increments are `-2`, `alpha - 2`, and
+`alpha - 1`, with `alpha > 0`. Hence every child of an expanded node has
+shift at least `-2`. Starting from the root shift `0`, every terminal in every
 full adaptive normal form lies in the exact interval `[-2,0)`.
 
 This replaces the generic compactness delay by the sharp universal delay
@@ -98,60 +98,61 @@ theorem legalChild_current_ge_neg_two {k : Nat} {hk : 2 ≤ k}
         simp [State.descend] <;>
         linarith [alpha_pos]
 
-end AdaptiveSharpDelayTwo
-
-namespace AdaptiveEliminationTree
-
 mutual
 
 /-- Every terminal in a normalized adaptive tree lies above `-2`, provided its
 root state does. -/
-theorem Normalized.terminalsAboveNegTwo {k : Nat} {hk : 2 ≤ k}
+theorem normalized_terminalsAboveNegTwo {k : Nat} {hk : 2 ≤ k}
     {potential : AdaptiveEliminationPolicy.ForcedPotential k hk}
     {state : State k} {tree : Tree k}
-    (normalized : AdaptiveEliminationTree.Normalized potential state tree)
+    (normalized : AdaptiveEliminationTree.Normalized
+      (hk := hk) potential state tree)
     (hstate : (-2 : Real) ≤ state.current.value) :
     tree.TerminalsAbove (-2 : Real) := by
   cases normalized with
   | terminal state hretarded =>
       exact hstate
   | l1 state hadvanced hrow principalNormalized auxiliaryNormalized =>
-      exact ⟨principalNormalized.terminalsAboveNegTwo
-          (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two
-            (AdaptiveEliminationPolicy.LegalChild.principal state hadvanced)),
-        auxiliaryNormalized.terminalsAboveNegTwo⟩
+      refine ⟨normalized_terminalsAboveNegTwo principalNormalized ?_,
+        normalizedFamily_terminalsAboveNegTwo auxiliaryNormalized⟩
+      exact legalChild_current_ge_neg_two
+        (potential := potential) (hk := hk)
+        (AdaptiveEliminationPolicy.LegalChild.principal
+          (potential := potential) state hadvanced)
   | l2 state hadvanced hrow principalNormalized =>
-      exact principalNormalized.terminalsAboveNegTwo
-        (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two
-          (AdaptiveEliminationPolicy.LegalChild.principal state hadvanced))
+      apply normalized_terminalsAboveNegTwo principalNormalized
+      exact legalChild_current_ge_neg_two
+        (potential := potential) (hk := hk)
+        (AdaptiveEliminationPolicy.LegalChild.principal
+          (potential := potential) state hadvanced)
   | l3 state hadvanced hrow principalNormalized auxiliaryNormalized =>
-      exact ⟨principalNormalized.terminalsAboveNegTwo
-          (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two
-            (AdaptiveEliminationPolicy.LegalChild.principal state hadvanced)),
-        auxiliaryNormalized.terminalsAboveNegTwo⟩
+      refine ⟨normalized_terminalsAboveNegTwo principalNormalized ?_,
+        normalizedFamily_terminalsAboveNegTwo auxiliaryNormalized⟩
+      exact legalChild_current_ge_neg_two
+        (potential := potential) (hk := hk)
+        (AdaptiveEliminationPolicy.LegalChild.principal
+          (potential := potential) state hadvanced)
 
 /-- Every normalized adaptive auxiliary family has all terminal shifts above
 `-2`. -/
-theorem NormalizedFamily.terminalsAboveNegTwo {k : Nat} {hk : 2 ≤ k}
+theorem normalizedFamily_terminalsAboveNegTwo {k : Nat} {hk : 2 ≤ k}
     {potential : AdaptiveEliminationPolicy.ForcedPotential k hk}
     {parent : State k} {source normalized : NonemptyFamily k}
     (familyNormalized : AdaptiveEliminationTree.NormalizedFamily
-      potential parent source normalized) :
+      (hk := hk) potential parent source normalized) :
     normalized.TerminalsAbove (-2 : Real) := by
   cases familyNormalized with
   | one label tree hlegal normalized =>
-      exact normalized.terminalsAboveNegTwo
-        (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two hlegal)
+      exact normalized_terminalsAboveNegTwo normalized
+        (legalChild_current_ge_neg_two
+          (potential := potential) (hk := hk) hlegal)
   | cons label tree hlegal normalized tailNormalized =>
-      exact ⟨normalized.terminalsAboveNegTwo
-          (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two hlegal),
-        tailNormalized.terminalsAboveNegTwo⟩
+      exact ⟨normalized_terminalsAboveNegTwo normalized
+          (legalChild_current_ge_neg_two
+            (potential := potential) (hk := hk) hlegal),
+        normalizedFamily_terminalsAboveNegTwo tailNormalized⟩
 
 end
-
-end AdaptiveEliminationTree
-
-namespace AdaptiveSharpDelayTwo
 
 /-- The fixed adaptive full trees share one positive upper margin and the exact
 universal delay `2`. -/
@@ -170,8 +171,8 @@ theorem fullTree_uniform_shiftBounds_two {k : Nat} {hk : 2 ≤ k}
     norm_num [State.root, Label.root, Label.value,
       EliminationShift.root, EliminationShift.value]
   exact Tree.sharpen_delay_two
-    ((AdaptiveCriticalChoice.fullTree_normalized potential index).terminalsAboveNegTwo
-      hroot)
+    (normalized_terminalsAboveNegTwo
+      (AdaptiveCriticalChoice.fullTree_normalized potential index) hroot)
     (hbounds index)
 
 #print axioms Erdos1135.KrasikovLagarias.AdaptiveSharpDelayTwo.fullTree_uniform_shiftBounds_two
