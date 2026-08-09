@@ -1,0 +1,171 @@
+name: K19 Depth-Discount Feasibility Scan
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - .github/workflows/k19-depth-discount-scan.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct and authenticate exact K19 weights
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 \
+            > "$RUNNER_TEMP/reproducers.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          chmod +x reproducers/*.sh
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" \
+            | sha256sum --check - | tee logs/weight-hash.out
+          echo "WEIGHT_FILE=$WORK/k19_gamma14551_16000.u32le" >> "$GITHUB_ENV"
+
+      - name: Compile depth-discount scanner
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat > "$RUNNER_TEMP/depth_discount_scan.cpp" <<'CPP'
+          #include <algorithm>
+          #include <array>
+          #include <cmath>
+          #include <cstdint>
+          #include <cstring>
+          #include <fcntl.h>
+          #include <iomanip>
+          #include <iostream>
+          #include <limits>
+          #include <string>
+          #include <sys/mman.h>
+          #include <sys/stat.h>
+          #include <unistd.h>
+
+          static constexpr uint64_t N = 387420489ULL;    // 3^18
+          static constexpr uint64_t AUX = 129140163ULL;  // 3^17
+          static constexpr uint64_t MOD = 1162261467ULL; // 3^19
+
+          struct Mapping {
+            int fd=-1; size_t bytes=0; const unsigned char* data=nullptr;
+            explicit Mapping(const char* path) {
+              fd=open(path,O_RDONLY); if(fd<0) throw std::runtime_error("open");
+              struct stat st{}; if(fstat(fd,&st)!=0) throw std::runtime_error("stat");
+              bytes=size_t(st.st_size);
+              data=static_cast<const unsigned char*>(mmap(nullptr,bytes,PROT_READ,MAP_PRIVATE,fd,0));
+              if(data==MAP_FAILED) throw std::runtime_error("mmap");
+            }
+            ~Mapping(){if(data&&data!=MAP_FAILED)munmap((void*)data,bytes);if(fd>=0)close(fd);}
+          };
+          static uint32_t rd(const unsigned char* p){uint32_t v;std::memcpy(&v,p,4);
+          #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            v=__builtin_bswap32(v);
+          #endif
+            return v;}
+          static uint64_t residue(uint64_t i){return 3*i+2;}
+          static uint32_t four_index(uint64_t i){return uint32_t(((4*residue(i)%MOD)-2)/3);}
+          static uint32_t l1_aux(uint64_t i){return uint32_t(((((4*residue(i)-2)/3)%N)-2)/3);}
+          static uint32_t l3_aux(uint64_t i){return uint32_t(((((2*residue(i)-1)/3)%N)-2)/3);}
+
+          struct Candidate {
+            long double gamma;
+            long double maxq=0;
+            uint64_t index=0;
+            int row=-1;
+            long double A=0,B=0,W=0;
+          };
+
+          int main(int argc,char**argv){
+            if(argc!=2){std::cerr<<"usage: scan WEIGHTS\n";return 2;}
+            Mapping m(argv[1]); if(m.bytes!=4ULL*N){std::cerr<<"bad size\n";return 3;}
+            const std::array<long double,8> gs = {
+              14551.0L/16000.0L,
+              0.909L, 0.908L, 0.907L, 0.905L, 0.903L, 0.902L, 0.9011L
+            };
+            std::array<Candidate,gs.size()> cs{};
+            for(size_t j=0;j<gs.size();++j) cs[j].gamma=gs[j];
+            for(uint64_t i=0;i<N;++i){
+              const long double w=rd(m.data+4*i);
+              const uint32_t fi=four_index(i);
+              const long double wf=rd(m.data+4ULL*fi);
+              const unsigned kind=unsigned(i%3);
+              long double wa=0;
+              if(kind==0 || kind==2){
+                const uint32_t ai=kind==0?l1_aux(i):l3_aux(i);
+                wa=std::min<long double>(rd(m.data+4ULL*ai),
+                  std::min<long double>(rd(m.data+4ULL*(ai+AUX)),
+                    rd(m.data+4ULL*(ai+2*AUX))));
+              }
+              for(auto& c:cs){
+                const long double c0=std::pow(2.0L,-2.0L*c.gamma);
+                long double req=0,A=0,B=0;
+                if(kind==0){
+                  const long double c1=std::pow(3.0L/4.0L,c.gamma);
+                  A=c0*wf+c1*wa;
+                  req=std::sqrt(w/A);
+                } else if(kind==1){
+                  A=c0*wf;
+                  req=std::sqrt(w/A);
+                } else {
+                  const long double c3=std::pow(3.0L/2.0L,c.gamma);
+                  A=c0*wf; B=c3*wa;
+                  const long double disc=B*B+4*A*w;
+                  req=(-B+std::sqrt(disc))/(2*A);
+                }
+                if(req>c.maxq){c.maxq=req;c.index=i;c.row=int(kind);c.A=A;c.B=B;c.W=w;}
+              }
+            }
+            std::cout<<std::setprecision(22);
+            const long double h=25.0L/8.0L;
+            for(const auto& c:cs){
+              const long double theta=1-c.gamma;
+              const long double kappa=std::pow(h,-theta)+8.0L/75.0L;
+              std::cout<<"GAMMA="<<c.gamma
+                       <<" REQUIRED_Q="<<c.maxq
+                       <<" FEASIBLE_Q_LT_ONE="<<(c.maxq<1?1:0)
+                       <<" CRITICAL_INDEX="<<c.index
+                       <<" ROW="<<c.row
+                       <<" KAPPA_WORST="<<kappa
+                       <<" LOCAL_GAIN_POSITIVE="<<(kappa>1?1:0)
+                       <<"\n";
+            }
+            return 0;
+          }
+          CPP
+          g++ -O3 -std=c++20 "$RUNNER_TEMP/depth_discount_scan.cpp" \
+            -o "$RUNNER_TEMP/depth_discount_scan"
+
+      - name: Scan all exact rows
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v "$RUNNER_TEMP/depth_discount_scan" "$WEIGHT_FILE" \
+            2>&1 | tee logs/depth-discount-scan.txt
+          grep -q '^GAMMA=' logs/depth-discount-scan.txt
+          sha256sum logs/* | tee logs/manifest.sha256
+
+      - name: Upload scan evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-depth-discount-scan-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
