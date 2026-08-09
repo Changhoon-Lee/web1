@@ -22,7 +22,8 @@ def eval {index : Type*} (expr : Expr index)
   match expr with
   | .leaf i shift cost => values i (y + shift) (budget - cost)
   | .add left right => left.eval values y budget + right.eval values y budget
-  | .min left right => min (left.eval values y budget) (right.eval values y budget)
+  | .min left right =>
+      Min.min (left.eval values y budget) (right.eval values y budget)
 
 noncomputable def coefficientValue {index : Type*} (expr : Expr index)
     (coefficients : index → ℝ) (lambda : ℝ) : ℝ :=
@@ -32,7 +33,7 @@ noncomputable def coefficientValue {index : Type*} (expr : Expr index)
       left.coefficientValue coefficients lambda +
         right.coefficientValue coefficients lambda
   | .min left right =>
-      min (left.coefficientValue coefficients lambda)
+      Min.min (left.coefficientValue coefficients lambda)
         (right.coefficientValue coefficients lambda)
 
 /-- Every leaf shift lies in `[-nu,-mu]` and every leaf depth cost is at most
@@ -56,11 +57,12 @@ theorem eval_mono_of_bounds {index : Type*} (expr : Expr index)
     expr.eval lower y budget ≤ expr.eval upper y budget := by
   induction expr with
   | leaf i shift cost =>
-      exact hleaf i shift cost hbounds.1 hbounds.2.1 hbounds.2.2
+      simpa [eval] using
+        hleaf i shift cost hbounds.1 hbounds.2.1 hbounds.2.2
   | add left right ihLeft ihRight =>
-      exact add_le_add (ihLeft hbounds.1) (ihRight hbounds.2)
+      simpa [eval] using add_le_add (ihLeft hbounds.1) (ihRight hbounds.2)
   | min left right ihLeft ihRight =>
-      exact min_le_min (ihLeft hbounds.1) (ihRight hbounds.2)
+      simpa [eval] using min_le_min (ihLeft hbounds.1) (ihRight hbounds.2)
 
 /-- Depth costs do not alter the exponential coefficient identity. -/
 theorem eval_exponential {index : Type*} (expr : Expr index)
@@ -80,11 +82,29 @@ theorem eval_exponential {index : Type*} (expr : Expr index)
       exact (mul_min_of_nonneg _ _
         (mul_nonneg hdelta (Real.rpow_nonneg hlambda.le y))).symm
 
+private theorem budget_mono (maxCost steps : ℕ) :
+    maxCost * (steps + 1) ≤ maxCost * (Nat.succ steps + 1) := by
+  exact Nat.mul_le_mul_left maxCost (by omega)
+
+private theorem previous_budget_le_sub
+    {maxCost steps cost : ℕ} (hcost : cost ≤ maxCost) :
+    maxCost * (steps + 1) ≤ maxCost * (Nat.succ steps + 1) - cost := by
+  apply Nat.le_sub_of_add_le
+  rw [show Nat.succ steps + 1 = (steps + 1) + 1 by omega,
+    Nat.mul_add, Nat.mul_one]
+  exact Nat.add_le_add_left hcost _
+
+private theorem maxCost_le_current_budget (maxCost steps : ℕ) :
+    maxCost ≤ maxCost * (Nat.succ steps + 1) := by
+  rw [show Nat.succ steps + 1 = (steps + 1) + 1 by omega,
+    Nat.mul_add, Nat.mul_one]
+  omega
+
 /--
 Retarded interval induction with a linear natural depth budget.
 
 At interval number `steps`, the available budget is
-`maxCost * (steps + 1)`.  One retarded macro-step consumes at most `maxCost`,
+`maxCost * (steps + 1)`. One retarded macro-step consumes at most `maxCost`,
 so every leaf can invoke the previous interval with its remaining budget.
 -/
 theorem exponential_lower_bound_on_intervals {index : Type*}
@@ -109,14 +129,12 @@ theorem exponential_lower_bound_on_intervals {index : Type*}
   induction steps with
   | zero =>
       intro i y hy hyUpper
-      apply hinitial i y maxCost hy
-      · simpa using hyUpper
-      · exact le_rfl
+      simpa using hinitial i y maxCost hy (by simpa using hyUpper) le_rfl
   | succ steps ih =>
       intro i y hy hyUpper
       by_cases hprevious : y ≤ nu + (steps : ℝ) * mu
       · have hprev := ih i y hy hprevious
-        exact hprev.trans (hbudgetMono i y (by omega))
+        exact hprev.trans (hbudgetMono i y (budget_mono maxCost steps))
       have htime : nu ≤ y := by
         have hnonneg : 0 ≤ (steps : ℝ) * mu :=
           mul_nonneg (Nat.cast_nonneg steps) hmu.le
@@ -145,13 +163,10 @@ theorem exponential_lower_bound_on_intervals {index : Type*}
             norm_num only [Nat.cast_succ] at hyUpper
             linarith
           have hprev := ih j (y + shift) hyLower hyUpperLeaf
-          have hbudget :
-              maxCost * (steps + 1) ≤
-                maxCost * (Nat.succ steps + 1) - cost := by
-            omega
-          exact hprev.trans (hbudgetMono j (y + shift) hbudget)
+          exact hprev.trans
+            (hbudgetMono j (y + shift) (previous_budget_le_sub hcost))
         _ ≤ values i y (maxCost * (Nat.succ steps + 1)) :=
-          hsystem i y _ htime (by omega)
+          hsystem i y _ htime (maxCost_le_current_budget maxCost steps)
 
 /-- Every nonnegative time has an exponential lower bound with some depth
 budget linear in the number of retarded intervals. -/
@@ -189,8 +204,8 @@ theorem exists_linear_budget_exponential_lower_bound {index : Type*}
           exact hsteps
         linarith)
 
-#print axioms DepthBudgetRetarded.exponential_lower_bound_on_intervals
-#print axioms DepthBudgetRetarded.exists_linear_budget_exponential_lower_bound
+#print axioms DepthBudgetRetarded.Expr.exponential_lower_bound_on_intervals
+#print axioms DepthBudgetRetarded.Expr.exists_linear_budget_exponential_lower_bound
 
 end Expr
 end DepthBudgetRetarded
