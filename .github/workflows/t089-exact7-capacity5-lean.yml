@@ -1,0 +1,96 @@
+name: T089 Exact-Seven Capacity-Five Lean Gate
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/t089_exact7_capacity5_matching.py
+      - collatz_k19/verify_t089_exact7_capacity5_matching.py
+      - collatz_k19/generate_t089_exact7_matching_lean.py
+      - .github/workflows/t089-exact7-capacity5-lean.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+
+jobs:
+  exact-lean-certificate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate and independently verify matching
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs certificate generated source
+          python3 collatz_k19/t089_exact7_capacity5_matching.py \
+            --output certificate/exact7-capacity5.tsv \
+            2>&1 | tee logs/generator.txt
+          python3 collatz_k19/verify_t089_exact7_capacity5_matching.py \
+            certificate/exact7-capacity5.tsv \
+            2>&1 | tee logs/verifier.txt
+          python3 collatz_k19/generate_t089_exact7_matching_lean.py \
+            certificate/exact7-capacity5.tsv generated/T089Exact7Capacity5.lean \
+            2>&1 | tee logs/lean-generator.txt
+          grep -q '^T089_EXACT7_CAPACITY5_MATCHING=PASS$' logs/generator.txt
+          grep -q '^CERTIFICATE_VERDICT=PASS$' logs/verifier.txt
+      - name: Prepare pinned Lean project
+        shell: bash
+        run: |
+          set -euxo pipefail
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          cp generated/T089Exact7Capacity5.lean source/
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+      - name: Fetch pinned dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+      - name: Compile finite certificate and audit axioms
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake env lean T089Exact7Capacity5.lean \
+            2>&1 | tee ../logs/lean.txt
+          if grep -q 'sorryAx' ../logs/lean.txt; then exit 5; fi
+          grep -q 'T089Exact7Capacity5.capacityFiveCertificate' ../logs/lean.txt
+          grep -q 'T089Exact7Capacity5.criticalMarginInteger' ../logs/lean.txt
+          printf '%s\n' \
+            'EXACT7_TWO_UNIT_ALTERNATIVES=PASS' \
+            'CAPACITY_FIVE_RANK_CERTIFICATE=PASS' \
+            'HEIGHT_7_OVER_2_THRESHOLD_662=PASS' \
+            'CRITICAL_INTEGER_MARGIN=PASS' \
+            'NO_SORRYAX=PASS' \
+            'FORMAL_GATE=PASS' | tee ../logs/verdict.txt
+          sha256sum ../certificate/exact7-capacity5.tsv \
+            T089Exact7Capacity5.lean ../logs/* | tee ../logs/manifest.sha256
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t089-exact7-capacity5-lean-${{ github.run_id }}
+          path: |
+            logs/
+            certificate/
+            generated/
+          if-no-files-found: error
+          retention-days: 30
