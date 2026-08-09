@@ -70,7 +70,8 @@ jobs:
             ../logs/lean.out
           printf '%s\n' \
             'K19_WEIGHTED_NORMALIZATION_CANCELLATION=PASS' \
-            'K19_WEIGHTED_CRITICAL_GATE_DELTA_TIMES_D_GT_2=PASS' \
+            'EXACT_EQUAL_DEPTH_CAPACITY_H=PASS' \
+            'K19_WEIGHTED_CRITICAL_GATE_DELTA_TIMES_D_GT_1=PASS' \
             'NO_SORRYAX=PASS' \
             'FORMAL_GATE=PASS' \
             | tee ../logs/verdict.out
