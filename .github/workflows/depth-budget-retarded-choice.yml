@@ -1,0 +1,84 @@
+name: Choice-Valued Depth-Budget Lean Gate
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/DepthBudgetRetarded.lean
+      - collatz_k19/DepthBudgetRetardedChoice.lean
+      - .github/workflows/depth-budget-retarded-choice.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+
+jobs:
+  lean-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare pinned Lean project
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source logs
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          cp collatz_k19/DepthBudgetRetarded.lean source/
+          cp collatz_k19/DepthBudgetRetardedChoice.lean source/
+          sha256sum collatz_k19/DepthBudgetRetarded*.lean | tee logs/source.sha256
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+      - name: Fetch pinned dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+          mkdir -p .lake/build/lib/lean
+          lake env lean DepthBudgetRetarded.lean \
+            -o .lake/build/lib/lean/DepthBudgetRetarded.olean \
+            -i .lake/build/lib/lean/DepthBudgetRetarded.ilean \
+            2>&1 | tee ../logs/lean.out
+      - name: Compile theorem and audit axioms
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake env lean DepthBudgetRetardedChoice.lean \
+            2>&1 | tee -a ../logs/lean.out
+          if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              DepthBudgetRetarded.lean DepthBudgetRetardedChoice.lean; then exit 6; fi
+          grep -q 'DepthBudgetRetarded.Expr.choice_exponential_lower_bound_on_intervals' \
+            ../logs/lean.out
+          grep -q 'DepthBudgetRetarded.Expr.choice_exists_linear_budget_exponential_lower_bound' \
+            ../logs/lean.out
+          printf '%s\n' \
+            'CHOICE_DEPTH_BUDGET_PROPAGATION=PASS' \
+            'LINEAR_ORBIT_DEPTH_BUDGET=PASS' \
+            'NO_SORRYAX=PASS' \
+            'FORMAL_GATE=PASS' | tee ../logs/verdict.out
+      - name: Upload Lean evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: depth-budget-retarded-choice-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
