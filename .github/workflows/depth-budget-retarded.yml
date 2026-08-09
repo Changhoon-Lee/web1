@@ -63,9 +63,9 @@ jobs:
               DepthBudgetRetarded.lean; then
             exit 6
           fi
-          grep -q 'DepthBudgetRetarded.exponential_lower_bound_on_intervals' \
+          grep -q 'DepthBudgetRetarded.Expr.exponential_lower_bound_on_intervals' \
             ../logs/lean.out
-          grep -q 'DepthBudgetRetarded.exists_linear_budget_exponential_lower_bound' \
+          grep -q 'DepthBudgetRetarded.Expr.exists_linear_budget_exponential_lower_bound' \
             ../logs/lean.out
           printf '%s\n' \
             'DEPTH_BUDGET_RETARDED_PROPAGATION=PASS' \
