@@ -1,0 +1,67 @@
+name: K19 Exact Slack Depth-Discount Certificate
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/k19_depth_discount_slack_certificate.cpp
+      - .github/workflows/k19-depth-discount-slack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install exact arithmetic dependency
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libboost-dev
+      - name: Reconstruct and authenticate exact K19 weights
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 > "$RUNNER_TEMP/reproducers.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          chmod +x reproducers/*.sh
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" | sha256sum --check - | tee logs/weight-hash.out
+          echo "WEIGHT_FILE=$WORK/k19_gamma14551_16000.u32le" >> "$GITHUB_ENV"
+      - name: Compile exact certificate verifier
+        shell: bash
+        run: |
+          set -euxo pipefail
+          g++ -O3 -march=native -std=c++20 collatz_k19/k19_depth_discount_slack_certificate.cpp \
+            -o "$RUNNER_TEMP/k19_depth_discount_slack_certificate"
+          sha256sum collatz_k19/k19_depth_discount_slack_certificate.cpp \
+            "$RUNNER_TEMP/k19_depth_discount_slack_certificate" | tee logs/verifier.sha256
+      - name: Verify all rows and scalar transfer
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v "$RUNNER_TEMP/k19_depth_discount_slack_certificate" "$WEIGHT_FILE" \
+            2>&1 | tee logs/depth-discount-slack.txt
+          grep -q '^EXACT_DEPTH_DISCOUNT_CERTIFICATE=PASS$' logs/depth-discount-slack.txt
+          sha256sum logs/* | tee logs/manifest.sha256
+      - name: Upload exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-depth-discount-slack-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
