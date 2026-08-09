@@ -1,0 +1,41 @@
+name: T089 Exact-Seven Two Unit Alternatives
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/t089_exact7_two_unit_alternatives.py
+      - .github/workflows/t089-exact7-two-unit-alternatives.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-enumeration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run exact 14-bit certificate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs
+          python3 collatz_k19/t089_exact7_two_unit_alternatives.py \
+            2>&1 | tee logs/exact7-two-unit-alternatives.txt
+          grep -q '^EXACT7_WORDS=3432$' logs/exact7-two-unit-alternatives.txt
+          grep -q '^VALUATION_REPLAY_FAILURES=0$' logs/exact7-two-unit-alternatives.txt
+          grep -q '^EVERY_EXACT7_HAS_TWO_UNIT_EXACT6_ALTERNATIVES=PASS$' \
+            logs/exact7-two-unit-alternatives.txt
+          sha256sum collatz_k19/t089_exact7_two_unit_alternatives.py \
+            logs/exact7-two-unit-alternatives.txt | tee logs/manifest.sha256
+      - name: Upload exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t089-exact7-two-unit-alternatives-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
