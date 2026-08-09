@@ -76,6 +76,8 @@ theorem NonemptyFamily.sharpen_delay_two {k : Nat}
 
 end
 
+end EliminationCriticalTree
+
 namespace AdaptiveSharpDelayTwo
 
 /-- Every legal child of an advanced adaptive parent has shift at least `-2`.
@@ -96,6 +98,10 @@ theorem legalChild_current_ge_neg_two {k : Nat} {hk : 2 ≤ k}
         simp [State.descend] <;>
         linarith [alpha_pos]
 
+end AdaptiveSharpDelayTwo
+
+namespace AdaptiveEliminationTree
+
 mutual
 
 /-- Every terminal in a normalized adaptive tree lies above `-2`, provided its
@@ -103,7 +109,7 @@ root state does. -/
 theorem Normalized.terminalsAboveNegTwo {k : Nat} {hk : 2 ≤ k}
     {potential : AdaptiveEliminationPolicy.ForcedPotential k hk}
     {state : State k} {tree : Tree k}
-    (normalized : Normalized potential state tree)
+    (normalized : AdaptiveEliminationTree.Normalized potential state tree)
     (hstate : (-2 : Real) ≤ state.current.value) :
     tree.TerminalsAbove (-2 : Real) := by
   cases normalized with
@@ -111,16 +117,16 @@ theorem Normalized.terminalsAboveNegTwo {k : Nat} {hk : 2 ≤ k}
       exact hstate
   | l1 state hadvanced hrow principalNormalized auxiliaryNormalized =>
       exact ⟨principalNormalized.terminalsAboveNegTwo
-          (legalChild_current_ge_neg_two
+          (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two
             (AdaptiveEliminationPolicy.LegalChild.principal state hadvanced)),
         auxiliaryNormalized.terminalsAboveNegTwo⟩
   | l2 state hadvanced hrow principalNormalized =>
       exact principalNormalized.terminalsAboveNegTwo
-        (legalChild_current_ge_neg_two
+        (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two
           (AdaptiveEliminationPolicy.LegalChild.principal state hadvanced))
   | l3 state hadvanced hrow principalNormalized auxiliaryNormalized =>
       exact ⟨principalNormalized.terminalsAboveNegTwo
-          (legalChild_current_ge_neg_two
+          (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two
             (AdaptiveEliminationPolicy.LegalChild.principal state hadvanced)),
         auxiliaryNormalized.terminalsAboveNegTwo⟩
 
@@ -129,18 +135,23 @@ theorem Normalized.terminalsAboveNegTwo {k : Nat} {hk : 2 ≤ k}
 theorem NormalizedFamily.terminalsAboveNegTwo {k : Nat} {hk : 2 ≤ k}
     {potential : AdaptiveEliminationPolicy.ForcedPotential k hk}
     {parent : State k} {source normalized : NonemptyFamily k}
-    (familyNormalized : NormalizedFamily potential parent source normalized) :
+    (familyNormalized : AdaptiveEliminationTree.NormalizedFamily
+      potential parent source normalized) :
     normalized.TerminalsAbove (-2 : Real) := by
   cases familyNormalized with
   | one label tree hlegal normalized =>
       exact normalized.terminalsAboveNegTwo
-        (legalChild_current_ge_neg_two hlegal)
+        (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two hlegal)
   | cons label tree hlegal normalized tailNormalized =>
       exact ⟨normalized.terminalsAboveNegTwo
-          (legalChild_current_ge_neg_two hlegal),
+          (AdaptiveSharpDelayTwo.legalChild_current_ge_neg_two hlegal),
         tailNormalized.terminalsAboveNegTwo⟩
 
 end
+
+end AdaptiveEliminationTree
+
+namespace AdaptiveSharpDelayTwo
 
 /-- The fixed adaptive full trees share one positive upper margin and the exact
 universal delay `2`. -/
