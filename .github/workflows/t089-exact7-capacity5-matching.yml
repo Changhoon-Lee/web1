@@ -1,0 +1,59 @@
+name: T089 Exact-Seven Capacity-Five Matching
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/t089_exact7_capacity5_matching.py
+      - collatz_k19/verify_t089_exact7_capacity5_matching.py
+      - .github/workflows/t089-exact7-capacity5-matching.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-certificate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate deterministic integral matching
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs certificate
+          python3 collatz_k19/t089_exact7_capacity5_matching.py \
+            --output certificate/exact7-capacity5.tsv \
+            2>&1 | tee logs/generator.txt
+          grep -q '^MIN_LEGAL_UNIT_ALTERNATIVES=2$' logs/generator.txt
+          grep -q '^MAX_REVERSE_LOAD=5$' logs/generator.txt
+          grep -q '^CRITICAL_MARGIN_H_EQ_7_OVER_2=PASS$' logs/generator.txt
+          grep -q '^T089_EXACT7_CAPACITY5_MATCHING=PASS$' logs/generator.txt
+      - name: Verify with independent constant formula
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 collatz_k19/verify_t089_exact7_capacity5_matching.py \
+            certificate/exact7-capacity5.tsv \
+            2>&1 | tee logs/verifier.txt
+          grep -q '^ROWS=6864$' logs/verifier.txt
+          grep -q '^MAX_REVERSE_LOAD=5$' logs/verifier.txt
+          grep -q '^HEIGHT_7_OVER_2_FROM_M_GE_662=PASS$' logs/verifier.txt
+          grep -q '^CRITICAL_MARGIN_INTEGER=PASS$' logs/verifier.txt
+          grep -q '^CERTIFICATE_VERDICT=PASS$' logs/verifier.txt
+          sha256sum collatz_k19/t089_exact7_capacity5_matching.py \
+            collatz_k19/verify_t089_exact7_capacity5_matching.py \
+            certificate/exact7-capacity5.tsv logs/generator.txt logs/verifier.txt \
+            | tee logs/manifest.sha256
+      - name: Upload exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t089-exact7-capacity5-matching-${{ github.run_id }}
+          path: |
+            logs/
+            certificate/
+          if-no-files-found: error
+          retention-days: 30
