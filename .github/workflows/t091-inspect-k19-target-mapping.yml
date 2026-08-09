@@ -1,0 +1,70 @@
+name: T091 Inspect K19 Target Mapping
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - .github/workflows/t091-inspect-k19-target-mapping.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+
+jobs:
+  inspect-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate overlay and collect target/index mapping modules
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source logs/files formal_tools
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 \
+            > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x formal_tools/*.py formal_tools/*.sh
+          python3 formal_tools/generate_k19_overlay_strict.py source \
+            | tee logs/overlay.out
+          printf '%s\n' \
+            source/Erdos1135/KrasikovLagarias/EliminationResidue.lean \
+            source/Erdos1135/KrasikovLagarias/K19PrincipalIndex.lean \
+            source/Erdos1135/KrasikovLagarias/K19CoefficientBridge.lean \
+            source/Erdos1135/KrasikovLagarias/K19PredecessorBridge.lean \
+            source/Erdos1135/KrasikovLagarias/K19PowerOfTwoTargets.lean \
+            source/Erdos1135/KrasikovLagarias/PeriodicTargetReduction.lean \
+            source/Erdos1135/KrasikovLagarias/PredecessorCount.lean \
+            source/Erdos1135/KrasikovLagarias/Envelope.lean \
+            > logs/requested-files.txt
+          while IFS= read -r file; do
+            [ -s "$file" ] || { echo "MISSING=$file"; exit 4; }
+            rel="${file#source/}"
+            mkdir -p "logs/files/$(dirname "$rel")"
+            cp "$file" "logs/files/$rel"
+          done < logs/requested-files.txt
+          grep -R -n -C 80 -E \
+            'principalIndex|powerTarget|AdmissibleTarget|target %|residue|periodic|Reachable|multiply|pow' \
+            logs/files --include='*.lean' > logs/mapping-neighborhood.txt || true
+          find logs -type f -print0 | sort -z | xargs -0 sha256sum > logs/manifest.sha256
+
+      - name: Upload mapping evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: t091-k19-target-mapping-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
