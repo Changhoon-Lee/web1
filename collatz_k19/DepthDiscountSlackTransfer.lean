@@ -43,8 +43,10 @@ theorem qMixed_row
     b^2 * L ≤ a^2 * A + a * b * B := by
   have hbase : b^2 * L ≤ a^2 * (A + B) := by
     exact qSquared_row hL (add_nonneg hA hB) ha hab hslack hRmax hscalar
+  have hba : 0 ≤ b - a := sub_nonneg.mpr hab
+  have hprod : 0 ≤ a * (b - a) * B :=
+    mul_nonneg (mul_nonneg ha hba) hB
   have haux : a^2 * B ≤ a * b * B := by
-    have hb : 0 ≤ b := ha.trans hab
     nlinarith
   nlinarith
 
