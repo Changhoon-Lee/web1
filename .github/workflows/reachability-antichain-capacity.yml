@@ -13,13 +13,14 @@ permissions:
   contents: read
 
 env:
+  SOURCE_METADATA_CACHE_KEY: k19-source-split-metadata-Linux-352f2f8dbecff8ed81b2cc986ee8e97c39b772e6
   SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
   SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
 
 jobs:
   lean-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - name: Prepare pinned Lean project
@@ -48,12 +49,21 @@ jobs:
           set -euxo pipefail
           lake update
           lake exe cache get
+      - name: Restore pinned source build boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: ${{ env.SOURCE_METADATA_CACHE_KEY }}
+          fail-on-cache-miss: true
       - name: Compile theorem and audit axioms
         working-directory: source
         shell: bash
         run: |
           set -euxo pipefail
-          lake env lean ReachabilityAntichainCapacity.lean 2>&1 | tee ../logs/lean.out
+          lake env lean ReachabilityAntichainCapacity.lean \
+            -o .lake/build/lib/lean/ReachabilityAntichainCapacity.olean \
+            -i .lake/build/lib/lean/ReachabilityAntichainCapacity.ilean \
+            2>&1 | tee ../logs/lean.out
           if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
           if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
               ReachabilityAntichainCapacity.lean; then exit 6; fi
