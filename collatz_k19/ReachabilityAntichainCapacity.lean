@@ -108,7 +108,8 @@ theorem sum_predecessorCount_le_cutoff_of_reachability_antichain
       ¬ Reaches first second) :
     ∑ target ∈ targets, predecessorCount target ceiling ≤ ceiling := by
   have h :=
-    sum_predecessorFinset_card_le_Icc_card_of_reachability_antichain hantichain
+    sum_predecessorFinset_card_le_Icc_card_of_reachability_antichain
+      (ceiling := ceiling) hantichain
   simpa [predecessorCount] using h
 
 #print axioms Erdos1135.KrasikovLagarias.reaches_or_reaches_of_common_source
