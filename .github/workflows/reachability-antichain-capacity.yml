@@ -82,3 +82,5 @@ jobs:
           path: logs/
           if-no-files-found: error
           retention-days: 30
+
+# Retry marker after a transient toolchain-download reset.
