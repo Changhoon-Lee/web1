@@ -72,13 +72,14 @@ theorem predecessorFinset_pairwiseDisjoint_of_reachability_antichain
   · exact (hantichain hfirst hsecond hne) hreach
   · exact (hantichain hsecond hfirst hne.symm) hreach
 
-/-- Exact finite capacity for an arbitrary reachability antichain. -/
-theorem sum_predecessorCount_le_cutoff_of_reachability_antichain
+/-- Exact finite cardinality bound before evaluating the size of `Icc`. -/
+theorem sum_predecessorFinset_card_le_Icc_card_of_reachability_antichain
     {targets : Finset Nat} {ceiling : Nat}
     (hantichain : ∀ {first second : Nat},
       first ∈ targets → second ∈ targets → first ≠ second →
       ¬ Reaches first second) :
-    ∑ target ∈ targets, predecessorCount target ceiling ≤ ceiling := by
+    ∑ target ∈ targets, (predecessorFinset target ceiling).card ≤
+      (Finset.Icc 1 ceiling).card := by
   let hpairwise : (↑targets : Set Nat).PairwiseDisjoint
       (fun target => predecessorFinset target ceiling) :=
     predecessorFinset_pairwiseDisjoint_of_reachability_antichain hantichain
@@ -97,7 +98,18 @@ theorem sum_predecessorCount_le_cutoff_of_reachability_antichain
   change
     (targets.disjiUnion (fun target => predecessorFinset target ceiling)
       hpairwise).card ≤ (Finset.Icc 1 ceiling).card at hcard
-  simpa only [Finset.card_disjiUnion, predecessorCount] using hcard
+  simpa only [Finset.card_disjiUnion] using hcard
+
+/-- Exact finite capacity for an arbitrary reachability antichain. -/
+theorem sum_predecessorCount_le_cutoff_of_reachability_antichain
+    {targets : Finset Nat} {ceiling : Nat}
+    (hantichain : ∀ {first second : Nat},
+      first ∈ targets → second ∈ targets → first ≠ second →
+      ¬ Reaches first second) :
+    ∑ target ∈ targets, predecessorCount target ceiling ≤ ceiling := by
+  have h :=
+    sum_predecessorFinset_card_le_Icc_card_of_reachability_antichain hantichain
+  simpa [predecessorCount] using h
 
 #print axioms Erdos1135.KrasikovLagarias.reaches_or_reaches_of_common_source
 #print axioms Erdos1135.KrasikovLagarias.sum_predecessorCount_le_cutoff_of_reachability_antichain
