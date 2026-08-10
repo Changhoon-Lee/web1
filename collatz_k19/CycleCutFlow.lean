@@ -34,7 +34,8 @@ theorem two_edge_unroll {A₀ A₁ r₀ r₁ B₀ B₁ : ℝ}
   calc
     A₀ ≤ r₀ * A₁ + B₀ := h₀
     _ ≤ r₀ * (r₁ * A₀ + B₁) + B₀ := by
-      exact add_le_add_right (mul_le_mul_of_nonneg_left h₁ hr₀) B₀
+      simpa [add_comm] using
+        (add_le_add_right (mul_le_mul_of_nonneg_left h₁ hr₀) B₀)
     _ = (r₀ * r₁) * A₀ + (B₀ + r₀ * B₁) := by ring
 
 #print axioms CycleCutFlow.return_gap
