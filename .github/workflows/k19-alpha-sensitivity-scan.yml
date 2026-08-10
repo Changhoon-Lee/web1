@@ -1,0 +1,70 @@
+name: K19 Fixed-Weight Exponent Sensitivity Scan
+
+on:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/k19_alpha_sensitivity_scan.cpp
+      - .github/workflows/k19-alpha-sensitivity-scan.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct and authenticate exact K19 weights
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 \
+            > "$RUNNER_TEMP/reproducers.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          chmod +x reproducers/*.sh
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" \
+            | sha256sum --check - | tee logs/weight-hash.out
+          echo "WEIGHT_FILE=$WORK/k19_gamma14551_16000.u32le" >> "$GITHUB_ENV"
+
+      - name: Compile scanner
+        shell: bash
+        run: |
+          set -euxo pipefail
+          g++ -O3 -march=native -std=c++20 \
+            collatz_k19/k19_alpha_sensitivity_scan.cpp \
+            -o "$RUNNER_TEMP/k19_alpha_sensitivity_scan"
+          sha256sum collatz_k19/k19_alpha_sensitivity_scan.cpp \
+            "$RUNNER_TEMP/k19_alpha_sensitivity_scan" | tee logs/scanner.sha256
+
+      - name: Scan all exact rows
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v "$RUNNER_TEMP/k19_alpha_sensitivity_scan" "$WEIGHT_FILE" \
+            2>&1 | tee logs/alpha-sensitivity.txt
+          grep -q '^EPS=' logs/alpha-sensitivity.txt
+          sha256sum logs/* | tee logs/manifest.sha256
+
+      - name: Upload scan evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-alpha-sensitivity-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
