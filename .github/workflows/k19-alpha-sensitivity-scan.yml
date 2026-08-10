@@ -57,7 +57,9 @@ jobs:
           set -euxo pipefail
           /usr/bin/time -v "$RUNNER_TEMP/k19_alpha_sensitivity_scan" "$WEIGHT_FILE" \
             2>&1 | tee logs/alpha-sensitivity.txt
-          grep -q '^EPS=' logs/alpha-sensitivity.txt
+          grep -q '^KIND=0 ' logs/alpha-sensitivity.txt
+          grep -q '^KIND=1 ' logs/alpha-sensitivity.txt
+          grep -q '^KIND=2 ' logs/alpha-sensitivity.txt
           sha256sum logs/* | tee logs/manifest.sha256
 
       - name: Upload scan evidence
