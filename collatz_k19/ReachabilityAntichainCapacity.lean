@@ -97,7 +97,7 @@ theorem sum_predecessorCount_le_cutoff_of_reachability_antichain
   change
     (targets.disjiUnion (fun target => predecessorFinset target ceiling)
       hpairwise).card ≤ (Finset.Icc 1 ceiling).card at hcard
-  simpa [predecessorCount] using hcard
+  simpa only [Finset.card_disjiUnion, predecessorCount] using hcard
 
 #print axioms Erdos1135.KrasikovLagarias.reaches_or_reaches_of_common_source
 #print axioms Erdos1135.KrasikovLagarias.sum_predecessorCount_le_cutoff_of_reachability_antichain
