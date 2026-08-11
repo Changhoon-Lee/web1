@@ -1,0 +1,40 @@
+name: BHMC source fetch only
+
+on:
+  push:
+    branches: [ncs-bhmc-prereg-20260811]
+    paths:
+      - '.github/workflows/bhmc_source_fetch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SPE10_COMMIT: 41f6aa7d0d09e75f94510f466ad6729f78291e32
+  SPE10_BLOB: e8f8e1e24ae66e27ce4b3a06c651c9cc120fdade
+
+jobs:
+  fetch-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch immutable SPE10 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source
+          curl --fail --location --retry 5 \
+            "https://raw.githubusercontent.com/idaholab/moose/${SPE10_COMMIT}/modules/porous_flow/examples/reservoir_model/spe10_case1.data" \
+            -o source/spe10_case1.data
+          test "$(wc -c < source/spe10_case1.data)" -eq 26932
+          git_blob=$(printf 'blob %s\0' "$(wc -c < source/spe10_case1.data)" | cat - source/spe10_case1.data | sha1sum | awk '{print $1}')
+          test "$git_blob" = "$SPE10_BLOB"
+          sha256sum source/spe10_case1.data > source/SHA256SUMS.txt
+          printf '%s\n' "$SPE10_COMMIT" > source/MOOSE_COMMIT.txt
+          printf '%s\n' "$SPE10_BLOB" > source/MOOSE_BLOB.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bhmc-spe10-immutable-source
+          path: source
+          if-no-files-found: error
+          retention-days: 90
