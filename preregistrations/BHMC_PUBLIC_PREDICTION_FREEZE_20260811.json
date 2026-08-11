@@ -1,0 +1,155 @@
+{
+  "builder_sha256": "5615df58010f06db76844db42eed70ca10fb1d0509aa92e4ddbc6e5e19f5950f",
+  "design_commit": "6305173f9c4b97cddd8247f6c21101f0191ab0c1",
+  "design_sha256": "3c44a11a71528583c1fefe8dcc714179b7f0930ce2b71660f785de7d86f0739d",
+  "fail_factor": 1.1,
+  "families": [
+    {
+      "closure": {
+        "WL_min_eigenvalue": 0.6279715891334108,
+        "WL_symmetry_relerr": 2.5166495956400053e-17,
+        "constraint_shape": [5040, 3],
+        "fixed_cone_dimension": 1,
+        "fundamental_cycle_count": 289,
+        "rank": 2,
+        "root_metric_recovery_relerr": 1.359619721512683e-15,
+        "sample_holonomy_commutator_2norm": 6.884656768567615e-08,
+        "singular_values": [0.13403603979535078, 0.012053535523619837, 1.0427713255855718e-15]
+      },
+      "construction": {
+        "generalized_smoother_radius": 3.9619092521811923,
+        "photo_sigma": 0.018400741433042024,
+        "psf_angle_degrees": 25.0,
+        "psf_sigma": [1.1, 0.7],
+        "tau": 0.11358160204004085
+      },
+      "dimension": 648,
+      "family": "F1_multichannel_astronomical_inverse_imaging",
+      "input_sha256": "e89799cfa894159ee2b74b8d2c324c7f934755f7f99e8cb37fe0f847a455d70e",
+      "nodes": 324,
+      "operator_file": "f1_hubble_operator.npz",
+      "operator_sha256": "157ea8d6889010b7676a46277b4a4665abeb6aea8c4a8c65e0c552523f0d188a",
+      "prediction": {
+        "beta_star": 1.4718942166027291,
+        "beta_star_interval": [1.471894216602729, 1.4718942166027293],
+        "boundary_branch": "-1",
+        "dominant_mode": {
+          "channel_energy": [0.7282376426532284, 0.4222072473800495],
+          "cycles_per_cell": [0.05555555555555555, 0.0],
+          "fft_index": [1, 0],
+          "grid_shape": [18, 18]
+        },
+        "fail_beta": 1.619083638263002,
+        "fail_extremes": [-1.1999689405039342, 0.9763691531235549],
+        "fail_rho": 1.1999689405039342,
+        "predicted_fail_growth_factor": 1.1999689405039342,
+        "predicted_repaired_contraction": 0.9787454136211403,
+        "repair_alpha": 0.8994424317499138,
+        "safe_beta": 1.3247047949424562,
+        "safe_extremes": [-0.8000314807963228, 0.9801874547623783],
+        "safe_rho": 0.9801874547623783
+      },
+      "preprocessed_sha256": "b42591acfb2bf2749e477dbb2ca30225307fb0f77619d15edb7c1556a811dbd9"
+    },
+    {
+      "closure": {
+        "WL_min_eigenvalue": 0.6080715759959194,
+        "WL_symmetry_relerr": 4.293773684231939e-17,
+        "constraint_shape": [156, 3],
+        "fixed_cone_dimension": 1,
+        "fundamental_cycle_count": 4,
+        "rank": 2,
+        "root_metric_recovery_relerr": 2.647667882399577e-16,
+        "sample_holonomy_commutator_2norm": 5.091419091023147e-06,
+        "singular_values": [0.048592913610460704, 0.0036178652455783403, 1.408387835019701e-16]
+      },
+      "construction": {
+        "edges": 15,
+        "generalized_smoother_radius": 4.415438407409247,
+        "holdout_years": 16,
+        "tau": 0.10191513468852507,
+        "training_years": 45
+      },
+      "dimension": 24,
+      "family": "F2_NOAA_El_Nino_distributed_vector_assimilation",
+      "input_sha256": "943c737c7430447b21cc819212e97c7e4aa895042043c129f8d4f04d465bff36",
+      "nodes": 12,
+      "operator_file": "f2_elnino_operator.npz",
+      "operator_sha256": "90b54e66d2899f2f7e7103aa8f39cb44a91da301ee992d979decf15e590b0bf9",
+      "prediction": {
+        "beta_star": 0.5316266732440146,
+        "beta_star_interval": [0.5316266732440145, 0.5316266732440147],
+        "boundary_branch": "-1",
+        "dominant_mode": {
+          "channel_energy": [0.6981594393090262, 0.024763037083062097],
+          "cycle_nodes": 12,
+          "cycles_per_node": 0.08333333333333333,
+          "harmonic_index": 1
+        },
+        "fail_beta": 0.5847893405684161,
+        "fail_extremes": [-1.1666422312696438, 0.5643739639475135],
+        "fail_rho": 1.1666422312696438,
+        "predicted_fail_growth_factor": 1.1666422312696438,
+        "predicted_repaired_contraction": 0.6651951364716381,
+        "repair_alpha": 0.768560269175516,
+        "safe_beta": 0.47846400591961313,
+        "safe_extremes": [-0.833732870365508, 0.637215406692237],
+        "safe_rho": 0.833732870365508
+      },
+      "preprocessed_sha256": "39b88f62bacb53ebfccc4f90e11fde0e99c7153753667572c81a10a70ec21ae3"
+    },
+    {
+      "closure": {
+        "WL_min_eigenvalue": 0.5781242608516423,
+        "WL_symmetry_relerr": 2.86145442932914e-17,
+        "constraint_shape": [3080, 3],
+        "fixed_cone_dimension": 1,
+        "fundamental_cycle_count": 171,
+        "rank": 2,
+        "root_metric_recovery_relerr": 4.702859212279107e-16,
+        "sample_holonomy_commutator_2norm": 9.828244536861905e-07,
+        "singular_values": [0.5938398966810996, 0.011442751051587256, 8.089947616832139e-16]
+      },
+      "construction": {
+        "generalized_smoother_radius": 7.995887762694812,
+        "grid": [10, 20],
+        "log_permeability_range": [-1.7505100577181218, 1.3800216632677391],
+        "physics_scale": 0.025,
+        "tau": 0.05627892903893624
+      },
+      "dimension": 400,
+      "family": "F3_SPE10_heterogeneous_porous_media_coupled_PDE",
+      "input_sha256": "b127cc7cf1cedbc48c6c2ba685339a846b91ea119bd3b57adb19948a56b3f864",
+      "source_artifact_sha256": "dfff5758d871d48b586122dd433b36586c6c6b26991eaa791be0f3528e8fb61a",
+      "source_git_blob": "e8f8e1e24ae66e27ce4b3a06c651c9cc120fdade",
+      "nodes": 200,
+      "operator_file": "f3_spe10_operator.npz",
+      "operator_sha256": "4155ad5e790489b2c4e5ef162014ac24e5b4c5f282e1c7e6bf017acd952d7070",
+      "prediction": {
+        "beta_star": 2.6459223253795203,
+        "beta_star_interval": [2.64592232537952, 2.6459223253795203],
+        "boundary_branch": "-1",
+        "continuation": "k(beta)=exp(beta*normalized_log_permeability) before harmonic averaging",
+        "dominant_mode": {
+          "channel_energy": [0.6805056000417714, 0.08061472692726136],
+          "cycles_per_cell": [0.1, 0.0],
+          "fft_index": [1, 0],
+          "grid_shape": [10, 20]
+        },
+        "fail_beta": 2.9105145579174727,
+        "fail_extremes": [-1.6136343043408665, 0.9996541680493376],
+        "fail_rho": 1.6136343043408665,
+        "predicted_fail_growth_factor": 1.6136343043408665,
+        "predicted_repaired_contraction": 0.9997353981800695,
+        "repair_alpha": 0.7651167551859875,
+        "safe_beta": 2.3813300928415684,
+        "safe_extremes": [-0.5597080420841102, 0.9996510507139741],
+        "safe_rho": 0.9996510507139741
+      },
+      "preprocessed_sha256": "44abba0417820aca1c27ec537ca0c09608a15cae242b91b96ef6e6bf911a69f6"
+    }
+  ],
+  "safe_factor": 0.9,
+  "schema": "BHMC_PUBLIC_PREDICTION_FREEZE_V1",
+  "trajectory_executed": false
+}
