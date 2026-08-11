@@ -1,0 +1,49 @@
+{
+  "authority": "GATE_REVIEW_PENDING",
+  "families": [
+    {
+      "crossing_branch": "-1",
+      "fail_observed": 1.1999689405039342,
+      "fail_predicted": 1.1999689405039342,
+      "family": "F1_multichannel_astronomical_inverse_imaging",
+      "fixed_point_preserved_residual": 5.56774356313731e-15,
+      "operator_sha256": "157ea8d6889010b7676a46277b4a4665abeb6aea8c4a8c65e0c552523f0d188a",
+      "repair_observed": 0.9787454136211404,
+      "repair_predicted": 0.9787454136211403,
+      "safe_observed": 0.9801874547623786,
+      "safe_predicted": 0.9801874547623783,
+      "wrong_scaling_rho": 1.1999301670220466
+    },
+    {
+      "crossing_branch": "-1",
+      "fail_observed": 1.1666422312696443,
+      "fail_predicted": 1.1666422312696438,
+      "family": "F2_NOAA_El_Nino_distributed_vector_assimilation",
+      "fixed_point_preserved_residual": 6.080941944488118e-16,
+      "operator_sha256": "90b54e66d2899f2f7e7103aa8f39cb44a91da301ee992d979decf15e590b0bf9",
+      "repair_observed": 0.6651951364716384,
+      "repair_predicted": 0.6651951364716381,
+      "safe_observed": 0.8337328703655082,
+      "safe_predicted": 0.833732870365508,
+      "wrong_scaling_rho": 1.1702585970423274
+    },
+    {
+      "crossing_branch": "-1",
+      "fail_observed": 1.6136343043408672,
+      "fail_predicted": 1.6136343043408665,
+      "family": "F3_SPE10_heterogeneous_porous_media_coupled_PDE",
+      "fixed_point_preserved_residual": 2.3446480403802455e-15,
+      "operator_sha256": "4155ad5e790489b2c4e5ef162014ac24e5b4c5f282e1c7e6bf017acd952d7070",
+      "repair_observed": 0.9997353981800698,
+      "repair_predicted": 0.9997353981800695,
+      "safe_observed": 0.9996510507139743,
+      "safe_predicted": 0.9996510507139741,
+      "wrong_scaling_rho": 1.555252251218238
+    }
+  ],
+  "prediction_commit": "8b85de5ae7a6ba04fe5ffd55975dcfdf4d6ac2fd",
+  "prediction_payload_sha256": "1bd45c083bed2cd41689028bfba5cd26a2cee2eff8785c1dfba4414f25bb77ad",
+  "result_file": "BHMC_CONFIRMATORY_RESULTS.json",
+  "result_payload_sha256": "7f61a3303c24e1d71a71957cf6ccaf856fca87556ca4f6c098d0ba1559cb0c43",
+  "schema": "BHMC_PUBLIC_CONFIRMATORY_RESULT_COMMITMENT_V1"
+}
