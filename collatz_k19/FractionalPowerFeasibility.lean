@@ -65,18 +65,23 @@ theorem coefficientValue_rpow_le {index : Type*}
           (Real.rpow_nonneg hlambda.le shift)
       have hshift :
           (lambda ^ shift) ^ p = lambda ^ (shift * p) :=
-        Real.rpow_mul hlambda.le
+        (Real.rpow_mul hlambda.le shift p).symm
       have hpShift :
           (lambda ^ p) ^ shift = lambda ^ (p * shift) :=
-        Real.rpow_mul hlambda.le
-      calc
-        (coefficients index * lambda ^ shift) ^ p =
-            coefficients index ^ p * (lambda ^ shift) ^ p := hmul
-        _ = coefficients index ^ p * lambda ^ (shift * p) := by rw [hshift]
-        _ = coefficients index ^ p * lambda ^ (p * shift) := by
-          congr 1
-          ring
-        _ = coefficients index ^ p * (lambda ^ p) ^ shift := by rw [hpShift]
+        (Real.rpow_mul hlambda.le p shift).symm
+      have hleafEq :
+          (coefficients index * lambda ^ shift) ^ p =
+            coefficients index ^ p * (lambda ^ p) ^ shift := by
+        calc
+          (coefficients index * lambda ^ shift) ^ p =
+              coefficients index ^ p * (lambda ^ shift) ^ p := hmul
+          _ = coefficients index ^ p * lambda ^ (shift * p) := by rw [hshift]
+          _ = coefficients index ^ p * lambda ^ (p * shift) := by
+            congr 1
+            ring
+          _ = coefficients index ^ p * (lambda ^ p) ^ shift := by
+            rw [hpShift]
+      exact hleafEq.le
   | add left right ihLeft ihRight =>
       simp only [Expr.coefficientValue]
       have hleft := coefficientValue_nonneg left coefficients
