@@ -7,6 +7,7 @@ on:
     paths:
       - collatz_k19/K19UniformMovingTarget.lean
       - collatz_k19/K19UniformAllTargetSource.lean
+      - collatz_k19/K19TemperedMovingTarget.lean
       - .github/workflows/k19-uniform-moving-target.yml
   workflow_dispatch:
 
@@ -65,9 +66,11 @@ jobs:
             | tee logs/exact_tree.out
           cp collatz_k19/K19UniformMovingTarget.lean source/
           cp collatz_k19/K19UniformAllTargetSource.lean source/
+          cp collatz_k19/K19TemperedMovingTarget.lean source/
           sha256sum \
             collatz_k19/K19UniformMovingTarget.lean \
             collatz_k19/K19UniformAllTargetSource.lean \
+            collatz_k19/K19TemperedMovingTarget.lean \
             | tee logs/source.sha256
 
       - name: Install source-pinned Lean
@@ -183,7 +186,7 @@ jobs:
           echo 'K19_GENERATED_CERTIFICATES=AUTHENTICATED_BINARY_IMPORTS' \
             | tee logs/frozen_boundaries.verdict
 
-      - name: Directly compile uniform moving-target theorems and audit axioms
+      - name: Directly compile uniform and tempered moving-target theorems
         working-directory: source
         shell: bash
         run: |
@@ -205,11 +208,11 @@ jobs:
           compile_module Erdos1135.KrasikovLagarias.K19PredecessorBridge
           compile_module K19UniformMovingTarget
           compile_module K19UniformAllTargetSource
+          compile_module K19TemperedMovingTarget
           if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
           if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
-              K19UniformMovingTarget.lean K19UniformAllTargetSource.lean; then
-            exit 6
-          fi
+              K19UniformMovingTarget.lean K19UniformAllTargetSource.lean \
+              K19TemperedMovingTarget.lean; then exit 6; fi
           grep -q \
             'K19UniformMovingTarget.uniform_nonperiodic_target_ratio_bound' \
             ../logs/lean.out
@@ -219,11 +222,19 @@ jobs:
           grep -q \
             'K19UniformAllTargetSource.exists_nonperiodic_principal_counterexample_source' \
             ../logs/lean.out
+          grep -q \
+            'K19TemperedMovingTarget.exists_uniform_tempered_principal_ratio_bound' \
+            ../logs/lean.out
+          grep -q \
+            'K19TemperedMovingTarget.temperedSixteenSideFactor_gt_eight_sevenths' \
+            ../logs/lean.out
           printf '%s\n' \
             'K19_UNIFORM_PRINCIPAL_RATIO_BOUND=PASS' \
             'K19_UNIFORM_NONPERIODIC_MOVING_TARGET_BOUND=PASS' \
             'K19_UNIFORM_ALL_ELIGIBLE_SOURCE_NORMALIZED_BOUND=PASS' \
             'K19_COUNTEREXAMPLE_NONPERIODIC_SOURCE_REDUCTION=PASS' \
+            'K19_SAME_EXPONENT_TEMPERED_WEIGHT_BOUND=PASS' \
+            'TEMPERED_16_SIDE_SCALAR_GT_8_OVER_7=PASS' \
             'K19_MOVING_TARGET_AXIOM_AUDIT=PASS_NO_SORRYAX' \
             'FORMAL_GATE=PASS' \
             | tee ../logs/verdict.out
@@ -232,7 +243,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: k19-uniform-moving-target-${{ github.run_id }}
+          name: k19-uniform-tempered-moving-target-${{ github.run_id }}
           path: logs/
           if-no-files-found: error
           retention-days: 30
