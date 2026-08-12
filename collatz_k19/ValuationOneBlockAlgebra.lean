@@ -4,7 +4,7 @@ import Mathlib
 # Algebraic core of the valuation-one odd-block side gain
 
 For the shortcut Collatz map, an odd state `x` with `v₂(3x+1)=1` has next odd
-state `(3x+1)/2`.  Replacing the continuation term by the side predecessor
+state `(3x+1)/2`. Replacing the continuation term by the side predecessor
 `3x+1` loses exactly `1/(x(3x+1))` in reciprocal mass.
 
 At the terminal state of a maximal such run, `v₂(3x+1)≥2`; using only the
@@ -26,8 +26,12 @@ theorem valuation_one_deficit_identity
       1 / ((3 * x + 1) / 2) = 2 / (3 * x + 1) := by
     field_simp [hthree]
   rw [hshortcut]
-  field_simp [hx, hthree]
-  ring
+  have hthree' : 1 + x * 3 ≠ 0 := by
+    intro h
+    apply hthree
+    linarith
+  field_simp [hx, hthree, hthree']
+  nlinarith [mul_inv_cancel₀ hthree']
 
 /-- Exact lower surplus obtained when the terminal odd continuation is at most
 `(3x+1)/4`. -/
