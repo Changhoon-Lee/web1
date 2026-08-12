@@ -1,0 +1,16 @@
+{
+  "schema": "FCPL_ECG_PRETRAJECTORY_BUDGET_FAILURE_V1",
+  "design_commit": "162a406d97f86ff45135daec2ba7b631dcfcb68f",
+  "prediction_commit": "dffe74c917494eaf196ae99faf0eab6cd0271aa7",
+  "prediction_sha256": "d25ed6cf846e5d755832665642ae8bb24b09eb601bcac38f076a742e89994660",
+  "trajectory_executed": false,
+  "failed_gate": "joint finite-time budget for fixed-point and ECG metric tolerances",
+  "frozen_scalar_repair_rate": 0.9090909090909092,
+  "frozen_scalar_repair_budget": 139,
+  "certified_relative_error_bound_at_budget": 1.7636677070195812e-06,
+  "required_relative_energy_control_scale": 5e-09,
+  "reason": "The design froze a G-norm target of 5e-6 but separately demanded 1e-8 relative accuracy for nonlinear ECG energy metrics. The frozen contraction budget logically guarantees the first requirement only. The stronger metric gate is not implied, so executing the trajectory would knowingly test an internally inconsistent protocol.",
+  "authority": "prospective campaign aborted before every safe, fail, repair, or random-schedule trajectory; no numerical trajectory result exists",
+  "no_relabeling": true,
+  "next_rule": "A clean new-input campaign must freeze a single theorem-derived budget strong enough for both state and native-metric gates before source download and before prediction. This ECG campaign remains failed and is not repaired or reused as confirmatory evidence."
+}
