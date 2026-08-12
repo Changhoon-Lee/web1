@@ -39,18 +39,12 @@ jobs:
           find source/Erdos1135/KrasikovLagarias -maxdepth 2 -type f | sort > logs/files.txt
           {
             for f in \
+              source/Erdos1135/KrasikovLagarias/Retarded.lean \
               source/Erdos1135/KrasikovLagarias/EliminationSourceSystem.lean \
               source/Erdos1135/KrasikovLagarias/K19CoefficientBridge.lean \
-              source/Erdos1135/KrasikovLagarias/K19PredecessorBridge.lean \
-              source/Erdos1135/KrasikovLagarias/K19CriticalChoice.lean \
-              source/Erdos1135/KrasikovLagarias/K19SourceBridge.lean \
-              source/Erdos1135/KrasikovLagarias/PredecessorCount.lean \
-              source/Erdos1135/KrasikovLagarias/Envelope.lean \
-              source/Erdos1135/KrasikovLagarias/EliminationTrace.lean \
-              source/Erdos1135/KrasikovLagarias/EliminationResidue.lean \
-              source/Erdos1135/KrasikovLagarias/DifferenceSystem.lean; do
+              source/Erdos1135/KrasikovLagarias/K19CriticalChoice.lean; do
               echo "===== $f ====="
-              if test -f "$f"; then sed -n '1,520p' "$f"; else echo MISSING; fi
+              if test -f "$f"; then sed -n '1,620p' "$f"; else echo MISSING; fi
             done
           } | tee logs/source-system.txt
       - uses: actions/upload-artifact@v4
