@@ -100,20 +100,19 @@ theorem coefficientValue_rpow_le {index : Type*}
               (lambda ^ p) := add_le_add ihLeft ihRight
   | min left right ihLeft ihRight =>
       simp only [Expr.coefficientValue]
-      have hleft := coefficientValue_nonneg left coefficients
-        hcoefficients hlambda
-      have hright := coefficientValue_nonneg right coefficients
-        hcoefficients hlambda
+      have hleft : 0 ≤ left.coefficientValue coefficients lambda :=
+        coefficientValue_nonneg left coefficients hcoefficients hlambda
+      have hright : 0 ≤ right.coefficientValue coefficients lambda :=
+        coefficientValue_nonneg right coefficients hcoefficients hlambda
       rcases le_total
-          (left.coefficientValue coefficients lambda)
-          (right.coefficientValue coefficients lambda) with hle | hle
+          (left.coefficientValue coefficients lambda : Real)
+          (right.coefficientValue coefficients lambda : Real) with hle | hle
       · rw [min_eq_left hle]
-        apply le_min ihLeft
-        exact (Real.rpow_le_rpow hleft hle hp).trans ihRight
+        exact le_min ihLeft
+          ((Real.rpow_le_rpow hleft hle hp).trans ihRight)
       · rw [min_eq_right hle]
-        apply le_min
-        · exact (Real.rpow_le_rpow hright hle hp).trans ihLeft
-        · exact ihRight
+        exact le_min
+          ((Real.rpow_le_rpow hright hle hp).trans ihLeft) ihRight
 
 /-- Any feasible nonnegative coefficient vector remains feasible after a
 concave fractional-power transform. -/
