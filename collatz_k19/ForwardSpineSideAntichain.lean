@@ -52,7 +52,7 @@ theorem side_predecessors_antichain
         side second = f^[tail] (f (side first)) := htail.symm
         _ = f^[tail] (f^[first + 1] root) := by rw [hside first]
         _ = f^[tail + (first + 1)] root := by
-          rw [Function.iterate_add_apply]
+          simpa only [Function.iterate_add_apply, Nat.add_assoc]
     have horbitEq :
         f^[tail + (first + 1) + 1] root =
           f^[second + 1] root := by
