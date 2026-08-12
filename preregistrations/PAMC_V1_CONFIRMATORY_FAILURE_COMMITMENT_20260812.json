@@ -1,0 +1,13 @@
+{
+  "all_pass": false,
+  "families": [
+    {"dominant_rate_relative_error":1.5964791800025895e-16,"fail_dominant_growth":538367.2725787228,"failed_gates":[],"family":"F1_Hubble_multichannel_inverse_imaging","pass":true,"repair_final_G_relative_error":1.2368914713253147e-15,"safe_final_G_relative_error":9.855895385224939e-16},
+    {"dominant_rate_relative_error":6.695448526307827e-16,"fail_dominant_growth":81062.8088848205,"failed_gates":[],"family":"F2_NOAA_El_Nino_seasonal_vector_assimilation","pass":true,"repair_final_G_relative_error":3.7239317689938427e-16,"safe_final_G_relative_error":2.407018637769835e-16},
+    {"dominant_rate_relative_error":0.0,"fail_dominant_growth":250055.2189760197,"failed_gates":["repair_fixed_point","safe_fixed_point"],"family":"F3_SPE10_two_species_finite_volume_PDE","pass":false,"repair_final_G_relative_error":0.0012811798915148016,"safe_final_G_relative_error":0.0032694051284884733}
+  ],
+  "full_result_sha256":"e8544be25e75ca4947a0d8524756f691095d369c5ebf9ba964af1554ea9f3b60",
+  "interpretation":"F1 and F2 passed. F3 stability direction, dominant rate, fail growth, and residual reduction passed, but frozen finite-iteration fixed-point tolerances failed. No gate was relabeled.",
+  "prediction_commit":"1c81262a6befc49bf126c418174ecde504e2dd8e",
+  "prediction_payload_sha256":"265e93d259ff115411bf299a798f582b7523704eef1081167f28537d2e5e2b2e",
+  "schema":"PAMC_V1_CONFIRMATORY_FAILURE_COMMITMENT"
+}
