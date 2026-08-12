@@ -8,6 +8,7 @@ on:
     paths:
       - collatz_k19/FractionalPowerFeasibility.lean
       - collatz_k19/K19FractionalCriticalChoice.lean
+      - collatz_k19/K19FractionalMovingTarget.lean
       - .github/workflows/k19-fractional-critical-choice.yml
 
 permissions:
@@ -65,9 +66,11 @@ jobs:
             | tee logs/exact_tree.out
           cp collatz_k19/FractionalPowerFeasibility.lean source/
           cp collatz_k19/K19FractionalCriticalChoice.lean source/
+          cp collatz_k19/K19FractionalMovingTarget.lean source/
           sha256sum \
             collatz_k19/FractionalPowerFeasibility.lean \
             collatz_k19/K19FractionalCriticalChoice.lean \
+            collatz_k19/K19FractionalMovingTarget.lean \
             | tee logs/source.sha256
 
       - name: Install source-pinned Lean
@@ -147,6 +150,7 @@ jobs:
           lake build \
             Erdos1135.KrasikovLagarias.EliminationTrace \
             Erdos1135.KrasikovLagarias.K19SourceBridge \
+            Erdos1135.KrasikovLagarias.K19PredecessorBridge \
             Erdos1135.KrasikovLagarias.AdaptiveCriticalChoice \
             Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk00 \
             Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk01 \
@@ -177,7 +181,7 @@ jobs:
           echo 'K19_GENERATED_CERTIFICATES=AUTHENTICATED_BINARY_IMPORTS' \
             | tee logs/frozen_boundaries.verdict
 
-      - name: Compile fractional K19 family and audit axioms
+      - name: Compile fractional K19 family and moving-target theorem
         working-directory: source
         shell: bash
         run: |
@@ -197,10 +201,14 @@ jobs:
           compile_module FractionalPowerFeasibility
           compile_module Erdos1135.KrasikovLagarias.K19CoefficientBridge
           compile_module Erdos1135.KrasikovLagarias.K19CriticalChoice
+          compile_module Erdos1135.KrasikovLagarias.K19PredecessorBridge
           compile_module K19FractionalCriticalChoice
+          compile_module K19FractionalMovingTarget
           if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
           if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
-              FractionalPowerFeasibility.lean K19FractionalCriticalChoice.lean; then
+              FractionalPowerFeasibility.lean \
+              K19FractionalCriticalChoice.lean \
+              K19FractionalMovingTarget.lean; then
             exit 6
           fi
           grep -q 'FractionalPowerFeasibility.feasible_poweredCoefficients' \
@@ -209,13 +217,18 @@ jobs:
             ../logs/lean.out
           grep -q 'K19FractionalCriticalChoice.phiValues19_fractional_exponential_lower_bound' \
             ../logs/lean.out
-          grep -q 'K19FractionalCriticalChoice.phiValues19_fifth_exponential_lower_bound' \
+          grep -q 'K19FractionalCriticalChoice.phiValues19_fourth_exponential_lower_bound' \
+            ../logs/lean.out
+          grep -q 'K19FractionalMovingTarget.exists_uniform_fractional_principal_ratio_bound' \
+            ../logs/lean.out
+          grep -q 'K19FractionalMovingTarget.exists_uniform_fourth_principal_ratio_bound' \
             ../logs/lean.out
           printf '%s\n' \
             'FRACTIONAL_POWER_FEASIBILITY=PASS' \
             'K19_FRACTIONAL_SOURCE_SYSTEM=PASS' \
             'K19_CONTINUUM_FRACTIONAL_ENVELOPE=PASS' \
-            'K19_FIFTH_ROOT_EXPONENT_14551_80000=PASS' \
+            'K19_FOURTH_ROOT_EXPONENT_14551_64000=PASS' \
+            'K19_FRACTIONAL_MOVING_TARGET=PASS' \
             'NO_SORRYAX=PASS' \
             'FORMAL_GATE=PASS' \
             | tee ../logs/verdict.out
