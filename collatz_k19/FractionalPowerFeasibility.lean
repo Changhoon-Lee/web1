@@ -1,4 +1,4 @@
-import Erdos1135.KrasikovLagarias.Retarded
+import Erdos1135.KrasikovLagarias.EliminationTrace
 import Mathlib.Analysis.MeanInequalitiesPow
 
 /-!
@@ -62,7 +62,8 @@ theorem coefficientValue_rpow_le {index : Type*}
         (Real.rpow_nonneg hlambda.le shift)]
       rw [← Real.rpow_mul hlambda.le, ← Real.rpow_mul hlambda.le]
       congr 1
-      ring
+      · exact le_rfl
+      · ring
   | add left right ihLeft ihRight =>
       simp only [Expr.coefficientValue]
       have hleft := coefficientValue_nonneg left coefficients
@@ -106,8 +107,6 @@ theorem feasible_poweredCoefficients {index : Type*}
     (hlambda : 0 < lambda) (hp : 0 ≤ p) (hpOne : p ≤ 1) :
     system.IsFeasible (poweredCoefficients coefficients p) (lambda ^ p) := by
   intro index
-  have hvalueNonneg := coefficientValue_nonneg (system index) coefficients
-    hcoefficients hlambda
   calc
     poweredCoefficients coefficients p index = coefficients index ^ p := rfl
     _ ≤ ((system index).coefficientValue coefficients lambda) ^ p :=
