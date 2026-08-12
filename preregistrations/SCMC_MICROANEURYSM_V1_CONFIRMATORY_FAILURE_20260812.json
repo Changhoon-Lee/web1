@@ -1,0 +1,19 @@
+{
+  "schema":"SCMC_MICROANEURYSM_V1_CONFIRMATORY_FAILURE",
+  "prediction_commit":"c9f4e6fc0f698ac1afb71b70544e9578f500fd96",
+  "mode_hash_amendment_commit":"07d26cfc3a41f8fc934dde5c5471793a63f96bb5",
+  "trajectory_executed":true,
+  "result_payload_sha256":"c616bda571ea2431f67fe309910b246716a7203950d4108f47d921da5a6fb9bf",
+  "all_pass":false,
+  "failed_gates":["sector_and_commutant_dimensions","weighted_closure_identity_and_sharp_gap"],
+  "passed_results":{
+    "safe_final_G_relative_error":1.7317827305629383e-09,
+    "repair_final_G_relative_error":3.076593950580313e-09,
+    "fail_growth":64.01751992323975,
+    "dominant_rate_relative_error":1.0649941969578228e-15,
+    "spectral_radii":[0.9575639791767603,1.0424686141920119,0.9800000000000006]
+  },
+  "root_cause":"The independent evaluator for sum_r ||[Diag(s),v_r v_r^T]||_F^2 implemented the wrong vectorized contraction. It effectively introduced cubic q_i terms. The correct factor contribution is 2[(sum q)(sum q_i s_i^2)-(sum q_i s_i)^2], q_i=v_i^2. Sector sizes, Laplacian eigenvalue, sharp-gap witness, trajectories, spectra, fixed points, hashes, thresholds, and native metrics were unchanged and had passed.",
+  "permitted_correction":"Replace only the erroneous direct-identity evaluator by the stated algebraically equivalent formula, separate the sector-dimension gate from the identity gate, and rerun the identical deterministic trajectory and original gates.",
+  "authority":"failed first confirmatory trajectory retained; no gate relabeled and no scientific prediction tuned"
+}
