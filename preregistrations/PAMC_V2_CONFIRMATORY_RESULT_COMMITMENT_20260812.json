@@ -1,0 +1,13 @@
+{
+  "all_pass":true,
+  "amendment_commit":"0e3cf45116110a5a2ad13336a17db9bfa0370619",
+  "families":[
+    {"dominant_rate_relative_error":1.5964791800025895e-16,"fail_dominant_growth":538367.2725787228,"family":"F1_Hubble_multichannel_inverse_imaging","fixed_point_preserved_relative":1.277337767878302e-15,"operator_sha256":"f8ca9271b23f357c4a2abd7760ba80c684905a805a43bb5738e7558631a13db6","pass":true,"repair_final_G_relative_error":1.88359154257398e-07,"safe_final_G_relative_error":2.2527597015543877e-08,"v2_budgets":{"fail":120,"fixed_point_tolerance":5e-06,"repair":68,"safe":61}},
+    {"dominant_rate_relative_error":6.695448526307827e-16,"fail_dominant_growth":81062.8088848205,"family":"F2_NOAA_El_Nino_seasonal_vector_assimilation","fixed_point_preserved_relative":4.105822118797042e-16,"operator_sha256":"8b008af112eb5c7fe2c963c49fa79ec043f7f363e1a99f810f32914f7d796c8f","pass":true,"repair_final_G_relative_error":6.434140755706882e-09,"safe_final_G_relative_error":1.0376669859411008e-08,"v2_budgets":{"fail":80,"fixed_point_tolerance":5e-06,"repair":34,"safe":42}},
+    {"dominant_rate_relative_error":0.0,"fail_dominant_growth":250055.2189760197,"family":"F3_SPE10_two_species_finite_volume_PDE","fixed_point_preserved_relative":2.855423069611893e-15,"operator_sha256":"75269e41dfa33df1d3f3defd5fd5756e69ea619869b60c5fb804d16c4972e351","pass":true,"repair_final_G_relative_error":1.0635642636016523e-05,"safe_final_G_relative_error":1.0662876335993025e-05,"v2_budgets":{"fail":120,"fixed_point_tolerance":0.0002,"repair":1320,"safe":1668}}
+  ],
+  "full_result_sha256":"e26e4a437a996a054a7d86e67790413b49440f1be4a66a74b9e150c54c495463",
+  "prediction_commit":"1c81262a6befc49bf126c418174ecde504e2dd8e",
+  "prediction_payload_sha256":"265e93d259ff115411bf299a798f582b7523704eef1081167f28537d2e5e2b2e",
+  "schema":"PAMC_V2_CONFIRMATORY_RESULT_COMMITMENT"
+}
