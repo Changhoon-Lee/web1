@@ -43,10 +43,14 @@ jobs:
               source/Erdos1135/KrasikovLagarias/K19CoefficientBridge.lean \
               source/Erdos1135/KrasikovLagarias/K19PredecessorBridge.lean \
               source/Erdos1135/KrasikovLagarias/K19CriticalChoice.lean \
+              source/Erdos1135/KrasikovLagarias/K19SourceBridge.lean \
+              source/Erdos1135/KrasikovLagarias/PredecessorCount.lean \
+              source/Erdos1135/KrasikovLagarias/Envelope.lean \
+              source/Erdos1135/KrasikovLagarias/EliminationTrace.lean \
               source/Erdos1135/KrasikovLagarias/EliminationResidue.lean \
               source/Erdos1135/KrasikovLagarias/DifferenceSystem.lean; do
               echo "===== $f ====="
-              if test -f "$f"; then sed -n '1,420p' "$f"; else echo MISSING; fi
+              if test -f "$f"; then sed -n '1,520p' "$f"; else echo MISSING; fi
             done
           } | tee logs/source-system.txt
       - uses: actions/upload-artifact@v4
