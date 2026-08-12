@@ -155,9 +155,15 @@ theorem uniform_nonperiodic_target_ratio_bound :
       norm_num only [Nat.cast_mul, Nat.cast_ofNat]
       exact hx
     have hraw := huniform index hadmissible hreach x hxSource
+    have hsourceRealPositive : 0 < (source : Real) := by
+      exact_mod_cast hsourcePositive
+    have hxNonnegative : 0 ≤ x :=
+      hsourceRealPositive.le.trans hxSource
+    have hratioNonnegative : 0 ≤ x / (source : Real) :=
+      div_nonneg hxNonnegative hsourceRealPositive.le
     have hpowerNonnegative :
         0 ≤ (x / (source : Real)) ^ gamma14551 :=
-      Real.rpow_nonneg (by positivity) _
+      Real.rpow_nonneg hratioNonnegative _
     have hdrop :
         constant * (x / (source : Real)) ^ gamma14551 ≤
           constant * k19PrincipalWeights index *
