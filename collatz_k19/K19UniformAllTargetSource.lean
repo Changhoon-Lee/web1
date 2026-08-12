@@ -162,9 +162,9 @@ theorem exists_nonperiodic_principal_counterexample_source
       Reaches source target ∧ SeparatedFromOne source :=
   exists_nonperiodic_principal_separated_source htarget hmod hseparated
 
-#print axioms Erdos1135.KrasikovLagias.K19UniformAllTargetSource.uniform_all_eligible_target_source_ratio_bound
-#print axioms Erdos1135.KrasikovLagias.K19UniformAllTargetSource.exists_nonperiodic_principal_separated_source
-#print axioms Erdos1135.KrasikovLagias.K19UniformAllTargetSource.exists_nonperiodic_principal_counterexample_source
+#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.uniform_all_eligible_target_source_ratio_bound
+#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.exists_nonperiodic_principal_separated_source
+#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.exists_nonperiodic_principal_counterexample_source
 
 end K19UniformAllTargetSource
 end KrasikovLagarias
