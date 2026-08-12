@@ -1,0 +1,20 @@
+{
+  "schema":"PAMC_F4_SUNSPOT_FAILURE_COMMITMENT_V1",
+  "prediction_commit":"8e73b5004069385eb0629a216e4f7b43b20616b9",
+  "prediction_payload_sha256":"d60335f343892b2334d96eab5d8d23a4ef780f259fe061984d4b4d7748db6f05",
+  "result_sha256":"afc766478f9b71785e2335420252a11d31af8855d41c770375f5c69be2794b07",
+  "pass":false,
+  "passed_gates":["hashes","strict_extension","safe_fixed_point","repair_fixed_point","dominant_rate","fail_growth","fixed_point_preserved","fail_native_divergence","breaker"],
+  "failed_gates":["safe_native_reduction","repair_native_reduction"],
+  "observed":{
+    "safe_final_G_relative_error":1.3709001311192835e-08,
+    "repair_final_G_relative_error":3.469714979216051e-10,
+    "dominant_rate_relative_error":3.401366443266641e-16,
+    "dominant_growth":162838.06216928884,
+    "safe_observation_residual_initial_final":[1.0,0.27851334661942273],
+    "repair_observation_residual_initial_final":[1.0,0.22210793772792184],
+    "fail_observation_residual_initial_final":[1.0,15429.641030474928]
+  },
+  "interpretation":"The spectral and fixed-point predictions passed. The frozen requirement that the held-out observation mismatch decrease by 1000x was invalid for a regularized fixed point, which is not required to interpolate the held-out state. The gate is not relabeled and the run remains failed.",
+  "procedural_note":"The first trajectory invocation completed numerical work but hit a NumPy-bool JSON serialization error before writing the result. Only serialization was corrected; operators, predictions, iteration counts, gates, and numeric trajectories were unchanged."
+}
