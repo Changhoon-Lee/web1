@@ -1,0 +1,24 @@
+{
+  "schema":"SCMC_MICROANEURYSM_GLOBAL_REPAIR_SUPPLEMENT_V1",
+  "base_result_commit":"a5142b3ea5889251ee215a32f883150a6e9a12e8",
+  "prediction_commit":"c9f4e6fc0f698ac1afb71b70544e9578f500fd96",
+  "updated_result_payload_sha256":"b0a45b1a0dc3d1e5b526da91e9901db58429b8b35d0feea1685dd2e3025cd59b",
+  "updated_result_file_sha256":"fcbcc8b1bccbe762dfdd69b7efd7b64ffd481129b6aab36d69cdd1030d326c1b",
+  "claim":"The frozen theta_repair is globally maximal on [0,1] among coherence values with spectral radius at most 0.98 for the sealed operator.",
+  "certificate":{
+    "target_radius":0.98,
+    "rank_two_secular_matrix":[[0.6855469328444941,2.2791670180205155],[2.6219404844427623,0.34277346642224704]],
+    "theta_roots":[-0.5164239465549841,0.33730066933041947],
+    "roots_in_unit_interval":[0.33730066933041947],
+    "theta_repair":0.33730066933041947,
+    "determinant_sign_at_theta_zero":1,
+    "small_determinant_at_theta_one":-5.769173376055171,
+    "rho_at_theta_zero":0.9214916280841325,
+    "rho_at_theta_repair":0.9800000000000006,
+    "rho_at_theta_repair_plus_1e_minus_7":0.9800001198856017
+  },
+  "argument":"At lambda=-0.98, the rank-two matrix determinant lemma reduces det(P(theta)+0.98 I) to det(A) det(I-theta K). The only root in [0,1] is theta_repair; the other root is negative. At theta=0 the complete spectrum lies inside radius 0.98 and det(A)>0. After the simple root the determinant is negative and cannot change sign again. Complex-conjugate factors contribute positively, so for every theta>theta_repair at least one real eigenvalue is below -0.98 and the spectral radius exceeds 0.98.",
+  "trajectory_change":false,
+  "prediction_change":false,
+  "authority":"post-confirmatory theorem strengthening using only frozen operator and path; no tuning"
+}
