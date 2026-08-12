@@ -1,0 +1,20 @@
+{
+  "schema":"SCMC_RETINA_BUILDER_FAILURE_V1",
+  "design_commit":"00c02f7374f67ad4b30a116b5339118f0f560f4c",
+  "t2_scope_amendment":"b494a634db433a609dd4aa0df68ad621b324f5f7",
+  "beta_amendment":"ef3866d674f78eb9e22e9222440b9fb40d08cdb0",
+  "trajectory_executed":false,
+  "input_sha256":"3670e389d0dae9f755cc1bb7e4da4c3d2cdf10eba2dc3060836d8d4b8024d860",
+  "input_shape":[1411,1411,3],
+  "failure_stage":"prediction_builder_precondition",
+  "frozen_beta":2.0,
+  "frozen_eta":1.0,
+  "observed_endpoint_spectral_radii":{
+    "theta_0":3.828351003456155e34,
+    "theta_1":3.828351003456155e34
+  },
+  "failed_gate":"stable_to_unstable_theta_crossing_on_[0,1]",
+  "root_cause":"The preregistered bilateral graph used no affinity floor or self-mass. Real retinal optical-density contrasts produced extremely small spatial degrees; the frozen L=D^{-1} scaling amplified the physics update catastrophically. The base theta=0 operator was already overwhelmingly unstable, so no admissible coherence crossing existed.",
+  "authority":"prospective builder failure retained; no threshold, trajectory, or repair claim",
+  "post_failure_rule":"No retina parameter, graph floor, self-loop, beta, or bridge strength may be changed and reclassified as confirmatory evidence. Any repaired protocol must use a new public design and a new untouched input."
+}
