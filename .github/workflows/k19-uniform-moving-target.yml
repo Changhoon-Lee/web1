@@ -113,7 +113,7 @@ jobs:
           cp -a adaptive_boundary/boundary/. "$DEST/"
           test -s "$BASE/Generated/K19AdaptiveForcedPotential.olean"
 
-      - name: Build ordinary dependencies without regenerating authenticated certificates
+      - name: Prebuild dependencies and adaptive hex chunks before freezing certificates
         working-directory: source
         shell: bash
         run: |
@@ -124,10 +124,29 @@ jobs:
             Erdos1135.KrasikovLagarias.K19SourceBridge \
             Erdos1135.KrasikovLagarias.PeriodicTargetReduction \
             Erdos1135.KrasikovLagarias.AdaptiveCriticalChoice \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk00 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk01 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk02 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk03 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk04 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk05 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk06 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk07 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk08 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk09 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk10 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk11 \
             2>&1 | tee ../logs/dependencies.out
           grep -q 'Build completed successfully' ../logs/dependencies.out
+          test "$(find .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated \
+            -name 'K19AdaptiveForcedPotentialHexChunk??.olean' | wc -l)" -eq 12
+          test -s .lake/build/lib/lean/Erdos1135/KrasikovLagarias/AdaptiveCriticalChoice.olean
           test -s .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.olean
           test -s .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.olean
+          printf '%s\n' \
+            'K19_ADAPTIVE_HEX_CHUNKS_PREBUILT=PASS' \
+            'K19_ADAPTIVE_CRITICAL_CHOICE_PREBUILT=PASS' \
+            | tee ../logs/dependencies.verdict
 
       - name: Freeze authenticated generated certificates as binary imports
         shell: bash
