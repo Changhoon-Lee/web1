@@ -1,0 +1,24 @@
+{
+  "schema":"PAMC_F5_NILE_CONFIRMATORY_RESULT_COMMITMENT_V1",
+  "prediction_commit":"1307024ad803a2d9af579ae7707ca66ebae0184e",
+  "prediction_payload_sha256":"52fc0b7f2cbd65c00fc4df3bca2390f465f563f1e4debd76c35ec27c87660332",
+  "result_sha256":"aafc2fed0c535b9c103079ee3c152c3e4136ae9fd082e7238485452c077a8562",
+  "operator_sha256":"37adb123372bf3c18c4c8788aa64cfee04329983469008b95033376a29989162",
+  "pass":true,
+  "observed":{
+    "safe_final_G_relative_error":1.3555563403569146e-08,
+    "repair_final_G_relative_error":1.4945412446151727e-11,
+    "safe_stationary_residual":2.7912234633451224e-08,
+    "repair_stationary_residual":3.1167260746941814e-11,
+    "dominant_rate":1.3435362227220278,
+    "dominant_rate_relative_error":3.305375786224282e-16,
+    "dominant_growth":243485.97617950995,
+    "fixed_point_preserved_relative":2.369185038366317e-16,
+    "safe_native_max_relative_error":2.4909902328992985e-09,
+    "repair_native_max_relative_error":3.1152395338049015e-12,
+    "safe_level_RMSE_physical":52.716966912058645,
+    "repair_level_RMSE_physical":49.20564928844861,
+    "fail_level_RMSE_physical":6063726.52556756
+  },
+  "all_frozen_gates_pass":true
+}
