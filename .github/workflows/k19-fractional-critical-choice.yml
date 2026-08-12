@@ -1,0 +1,231 @@
+name: K19 Fractional Critical-Choice Lean Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/FractionalPowerFeasibility.lean
+      - collatz_k19/K19FractionalCriticalChoice.lean
+      - .github/workflows/k19-fractional-critical-choice.yml
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  LEAN_STACK_SIZE_KB: 1572864
+  SOURCE_METADATA_CACHE_KEY: k19-source-split-metadata-Linux-352f2f8dbecff8ed81b2cc986ee8e97c39b772e6
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+  WEIGHT_SHA256: 82a71c4e1ca22ea94c0d3338fbea93c8d052e659a65a2101a1643bfdda7f8d79
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  fractional-envelope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct authenticated exact tree and pinned source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source logs formal_tools reproducers source_valid_overlay adaptive_boundary
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 \
+            > "$RUNNER_TEMP/reproducers.tar.gz"
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 \
+            > "$RUNNER_TEMP/formal_tools.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" \
+            | sha256sum --check -
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/formal_tools.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          tar -xzf "$RUNNER_TEMP/formal_tools.tar.gz" -C formal_tools
+          chmod +x reproducers/*.sh formal_tools/*.py formal_tools/*.sh collatz_k19/*.sh
+
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$WEIGHT_SHA256  $WORK/k19_gamma14551_16000.u32le" \
+            | sha256sum --check - | tee logs/weight-hash.out
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" \
+            | sha256sum --check - | tee logs/potential-hash.out
+
+          collatz_k19/prepare_k19_exact_chunked_tree.sh source formal_tools "$WORK" \
+            | tee logs/exact_tree.out
+          cp collatz_k19/FractionalPowerFeasibility.lean source/
+          cp collatz_k19/K19FractionalCriticalChoice.lean source/
+          sha256sum \
+            collatz_k19/FractionalPowerFeasibility.lean \
+            collatz_k19/K19FractionalCriticalChoice.lean \
+            | tee logs/source.sha256
+
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch exact pinned dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+
+      - name: Restore exact source Data and MetadataValid boundary
+        uses: actions/cache/restore@v5
+        with:
+          path: source/.lake/build
+          key: ${{ env.SOURCE_METADATA_CACHE_KEY }}
+          fail-on-cache-miss: true
+
+      - name: Download authenticated source Valid overlay
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 31249565370
+          name: k19-source-valid-overlay-31249565370
+          path: source_valid_overlay
+
+      - name: Verify and install source Valid overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          (cd source_valid_overlay && sha256sum --check manifest.sha256) \
+            | tee logs/source_overlay_verify.out
+          GEN=source/.lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated
+          cp source_valid_overlay/Generated/*.olean "$GEN/"
+          grep -q 'K19_SOURCE_EXACT_VALID=PASS' source_valid_overlay/source_valid.verdict
+          test -s "$GEN/K19Gamma14551.olean"
+
+      - name: Download axiom-audited adaptive Valid boundary
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 31246072144
+          name: k19-adaptive-exact-valid-boundary-31246072144
+          path: adaptive_boundary
+
+      - name: Verify and install adaptive Valid boundary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          (cd adaptive_boundary && sha256sum --check logs/boundary.sha256) \
+            | tee logs/adaptive_boundary_verify.out
+          DEST=source/.lake/build/lib/lean
+          BASE="$DEST/Erdos1135/KrasikovLagarias"
+          for module in StreamingCertificate ChunkedStreamingCertificate; do
+            current=$(sha256sum "$BASE/$module.olean" | awk '{print $1}')
+            supplied=$(sha256sum \
+              "adaptive_boundary/boundary/Erdos1135/KrasikovLagarias/$module.olean" \
+              | awk '{print $1}')
+            test "$current" = "$supplied"
+          done
+          cp -a adaptive_boundary/boundary/. "$DEST/"
+          test -s "$BASE/Generated/K19AdaptiveForcedPotential.olean"
+
+      - name: Prebuild exact K19 dependencies and hex chunks
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake build \
+            Erdos1135.KrasikovLagarias.EliminationTrace \
+            Erdos1135.KrasikovLagarias.K19SourceBridge \
+            Erdos1135.KrasikovLagarias.AdaptiveCriticalChoice \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk00 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk01 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk02 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk03 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk04 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk05 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk06 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk07 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk08 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk09 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk10 \
+            Erdos1135.KrasikovLagarias.Generated.K19AdaptiveForcedPotentialHexChunk11 \
+            2>&1 | tee ../logs/dependencies.out
+          grep -q 'Build completed successfully' ../logs/dependencies.out
+          test "$(find .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated \
+            -name 'K19AdaptiveForcedPotentialHexChunk??.olean' | wc -l)" -eq 12
+          test -s .lake/build/lib/lean/Erdos1135/KrasikovLagarias/AdaptiveCriticalChoice.olean
+          test -s .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential.olean
+          test -s .lake/build/lib/lean/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551.olean
+
+      - name: Freeze authenticated generated certificates as binary imports
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19Gamma14551*.lean
+          rm -f source/Erdos1135/KrasikovLagarias/Generated/K19AdaptiveForcedPotential*.lean
+          echo 'K19_GENERATED_CERTIFICATES=AUTHENTICATED_BINARY_IMPORTS' \
+            | tee logs/frozen_boundaries.verdict
+
+      - name: Compile fractional K19 family and audit axioms
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          compile_module() {
+            local module=$1
+            local rel=${module//.//}
+            local src="$rel.lean"
+            local out=".lake/build/lib/lean/$rel.olean"
+            local ilean=".lake/build/lib/lean/$rel.ilean"
+            mkdir -p "$(dirname "$out")"
+            echo "DIRECT_COMPILE=$module" | tee -a ../logs/lean.out
+            lake env lean "$src" -o "$out" -i "$ilean" \
+              2>&1 | tee -a ../logs/lean.out
+            test -s "$out"
+          }
+          compile_module FractionalPowerFeasibility
+          compile_module Erdos1135.KrasikovLagarias.K19CoefficientBridge
+          compile_module Erdos1135.KrasikovLagarias.K19CriticalChoice
+          compile_module K19FractionalCriticalChoice
+          if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              FractionalPowerFeasibility.lean K19FractionalCriticalChoice.lean; then
+            exit 6
+          fi
+          grep -q 'FractionalPowerFeasibility.feasible_poweredCoefficients' \
+            ../logs/lean.out
+          grep -q 'K19FractionalCriticalChoice.fractionalSourceSystem_isFeasible' \
+            ../logs/lean.out
+          grep -q 'K19FractionalCriticalChoice.phiValues19_fractional_exponential_lower_bound' \
+            ../logs/lean.out
+          grep -q 'K19FractionalCriticalChoice.phiValues19_fifth_exponential_lower_bound' \
+            ../logs/lean.out
+          printf '%s\n' \
+            'FRACTIONAL_POWER_FEASIBILITY=PASS' \
+            'K19_FRACTIONAL_SOURCE_SYSTEM=PASS' \
+            'K19_CONTINUUM_FRACTIONAL_ENVELOPE=PASS' \
+            'K19_FIFTH_ROOT_EXPONENT_14551_80000=PASS' \
+            'NO_SORRYAX=PASS' \
+            'FORMAL_GATE=PASS' \
+            | tee ../logs/verdict.out
+
+      - name: Upload exact Lean evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-fractional-critical-choice-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
