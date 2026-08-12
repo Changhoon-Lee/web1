@@ -1,0 +1,34 @@
+name: FCPL immutable SciPy ECG source fetch v2
+
+on:
+  push:
+    branches: [ncs-factorization-complete-phase-20260813]
+    paths: ['.github/workflows/fcpl_ecg_source_fetch_v2.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch official scipy/dataset-ecg source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source
+          url='https://raw.githubusercontent.com/scipy/dataset-ecg/main/ecg.dat'
+          curl --fail --location --retry 8 --retry-all-errors --connect-timeout 30 \
+            "$url" -o source/ecg.dat
+          test -s source/ecg.dat
+          sha256sum source/ecg.dat > source/SHA256SUMS.txt
+          stat -c '%n %s' source/ecg.dat > source/SIZES.txt
+          file source/ecg.dat > source/FILE_METADATA.txt
+          printf '%s\n' 'https://github.com/scipy/dataset-ecg/blob/main/ecg.dat' > source/SOURCE_URL.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fcpl-ecg-official-source-v2
+          path: source
+          if-no-files-found: error
+          retention-days: 90
