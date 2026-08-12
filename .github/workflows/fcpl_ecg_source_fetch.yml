@@ -1,0 +1,44 @@
+name: FCPL immutable SciPy ECG source fetch
+
+on:
+  push:
+    branches: [ncs-factorization-complete-phase-20260813]
+    paths: ['.github/workflows/fcpl_ecg_source_fetch.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch official scipy/dataset-ecg source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source
+          url='https://raw.githubusercontent.com/scipy/dataset-ecg/main/ecg.dat'
+          curl --fail --location --retry 8 --retry-all-errors --connect-timeout 30 \
+            "$url" -o source/ecg.dat
+          test -s source/ecg.dat
+          sha256sum source/ecg.dat > source/SHA256SUMS.txt
+          stat -c '%n %s' source/ecg.dat > source/SIZES.txt
+          printf '%s\n' 'https://github.com/scipy/dataset-ecg/blob/main/ecg.dat' > source/SOURCE_URL.txt
+          python3 - <<'PY'
+          import numpy as np
+          p='source/ecg.dat'
+          with np.load(p) as z:
+              assert 'ecg' in z.files
+              x=z['ecg']
+              assert x.shape==(108000,)
+              assert x.dtype==np.uint16
+              text=f'shape={x.shape}\ndtype={x.dtype}\nmin={int(x.min())}\nmax={int(x.max())}\n'
+          open('source/ARRAY_METADATA.txt','w').write(text)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fcpl-ecg-official-source
+          path: source
+          if-no-files-found: error
+          retention-days: 90
