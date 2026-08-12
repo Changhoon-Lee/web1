@@ -1,0 +1,86 @@
+{
+  "design_commit": "fdeeb270ee07f1715fabb0c838ff5b3230849dca",
+  "family": {
+    "closure_residuals": {
+      "bridge_commutator_fro": 2.8284271247461903,
+      "full_BHMC_defect": 0.11009637651263607,
+      "mixing": 4.033514580243903e-17,
+      "physics": 5.141523848471075e-17
+    },
+    "dimension": 512,
+    "direct_native_metrics": {
+      "fail": {
+        "DAB_PSNR_dB": 21.282793346890635,
+        "DAB_RMSE_standardized": 0.29312846371999635,
+        "hematoxylin_PSNR_dB": 23.306932594232165,
+        "hematoxylin_RMSE_standardized": 0.3594386354659022,
+        "observation_residual": 0.1941210291658327
+      },
+      "fail_stationary": 5.061249345138161e-16,
+      "safe": {
+        "DAB_PSNR_dB": 19.997126302283043,
+        "DAB_RMSE_standardized": 0.3398923141086139,
+        "hematoxylin_PSNR_dB": 22.996761479451983,
+        "hematoxylin_RMSE_standardized": 0.37250603451750713,
+        "observation_residual": 0.23250507746575275
+      },
+      "safe_stationary": 4.750773653928926e-16
+    },
+    "factor_components_after_bridge": [512],
+    "factor_components_before": [256, 256],
+    "factor_count": 1984,
+    "factor_list_sha256": "e307ecb4deb497c4ec906bc562b76d7143b8fa8a2abee14d73213d9690eacbc8",
+    "factor_split": {
+      "PSD_min_eigenvalue": 0.0,
+      "commutator_fro": 2.8284271247461903,
+      "diagonal_preservation_error": 0.0,
+      "distance_fro": 1.4142135623730951,
+      "nonnegative_min_entry": 0.0,
+      "predicted_distance_fro": 1.4142135623730951
+    },
+    "fail_fixed_point_sha256": "b2972948f6a99d7eaf143205899a52deb8a42289e8a0271d0dff703e80fa4b2b",
+    "family": "IHC_HED_two_stain_inverse_microscopy",
+    "fixed_point_tolerance": 5e-06,
+    "forcing_sha256": "df4e34ec0b466257302311d55b69c9fe440329457bd26cf17ee60d1e81f38b0a",
+    "input_sha256": "71d77a9f09b56eb0aa41bcda5ae04814540ed3960a5fda919b5f4670ea169dcc",
+    "nodes": 256,
+    "operator_sha256": "c13f8f1a9c379af5cb65cd0c9ea83633f7f495c321bf2dcc46f2ee52291f7c89",
+    "prediction": {
+      "beta_fail": 2.80849580352024,
+      "beta_safe": 1.87233053568016,
+      "chebyshev_bound_at_budget": 1.7610924021540314e-09,
+      "chebyshev_budget": 28,
+      "chebyshev_c": 1.2903105145024345,
+      "chebyshev_min_degree": 18,
+      "dominant_eigenvalue": -1.369661301320267,
+      "dominant_vector_sha256": "e288252eefe9e3d32c717ffc30892781122fd7191e37b61523adc3fcebae21f0",
+      "fail_budget": 40,
+      "fail_interval": [-1.3696613013202659, 0.6996313001111781],
+      "fail_rho": 1.3696613013202659,
+      "predicted_fail_growth": 291425.40702125494,
+      "safe_interval": [-0.6318222944549864, 0.7754291406355092],
+      "safe_rho": 0.7754291406355092,
+      "scalar_alpha": 0.7490552537216161,
+      "scalar_budget": 58,
+      "scalar_rate": 0.7750072472947467
+    },
+    "preprocessed_sha256": "68dfbd00003c6af2f5907b8dee17369ef39d6e7509e7e86d2dc243723d13baf5",
+    "safe_fixed_point_sha256": "5bc8b0d679fccb4189111de7a02ae0ae106d852d1ae4d1cf4977495e193b03f3",
+    "threshold_certificate": {
+      "beta_hat": 2.3404131696002,
+      "beta_interval": [2.3404131693661587, 2.340413169834241],
+      "beta_residual_first_order": 2.363898847557231e-15,
+      "delta_beta": 2.3404131696002e-10,
+      "eigensolver_reconstruction_residual": 2.330580976964264e-14,
+      "high_endpoint_min_eigenvalue": -2.6030966150909687e-10,
+      "lambda_gap": 0.006416886379485676,
+      "lambda_generalized": 0.427274984173339,
+      "lambda_residual": 4.315626214195032e-16,
+      "lambda_standard_reduction": 0.4272749841733392,
+      "low_endpoint_min_eigenvalue": 2.60308609685932e-10
+    }
+  },
+  "prediction_payload_sha256": "d608fcfb95f23a1a78e7a7d53d29a7583a9b085aa49b90f9f14f8264fd5e0d97",
+  "schema": "FGMC_IHC_PUBLIC_PREDICTION_COMMITMENT_V1",
+  "trajectory_executed": false
+}
