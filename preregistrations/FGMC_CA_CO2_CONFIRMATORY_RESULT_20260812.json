@@ -1,0 +1,31 @@
+{
+  "schema": "FGMC_CO2_CONFIRMATORY_RESULT_COMMITMENT_V1",
+  "design_commit": "68bf468d8fd47c239a27f384f10d912e546d4866",
+  "prediction_commit": "a53474c893c3ba1e6b989e4082fba7f1c4442855",
+  "serialization_incident_commit": "ec9af9bb5ea3754f0adf7bcaefef2eb76c6b3ce9",
+  "prediction_payload_sha256": "f6ef7ded24483f5cd4dbba7306eb35c6a4f2ef48ddc228e25aa8ade55e2f9bb9",
+  "result_payload_sha256": "4a7604d99b7db0b249049cd325069c989833c332ca04f45d0f3bd9c73f229b1a",
+  "operator_sha256": "1a02ded9ef99b79faf483dc27f09763fa56a75a67d926d2734d76b812b355436",
+  "history_sha256": "ec6c11c15b89db0e9ec5809978aac7fa833f3df21594c54ae852827ba6a35f2f",
+  "pass": true,
+  "all_original_gates_pass": true,
+  "observed": {
+    "factor_component_sizes_before": [52, 52],
+    "factor_component_sizes_after_bridge": [104],
+    "dense_commutant_dimensions": [2, 1],
+    "safe_final_G_relative_error": 5.466711700931122e-09,
+    "dominant_rate": 1.3256320645390978,
+    "dominant_rate_relative_error": 8.375046548162406e-16,
+    "dominant_growth": 183733.78128564815,
+    "scalar_budget": 41,
+    "scalar_first_tolerance_iteration": 28,
+    "scalar_final_G_relative_error": 1.7836665850140293e-08,
+    "chebyshev_budget": 24,
+    "chebyshev_first_tolerance_iteration": 14,
+    "chebyshev_final_G_relative_error": 1.3694383234824403e-10,
+    "scalar_native_max_relative_error": 2.8734541950965857e-08,
+    "chebyshev_native_max_relative_error": 1.0977523574459521e-10,
+    "bridge_commutator_fro": 2.8284271247461903
+  },
+  "authority": "externally timestamped theorem-to-workflow computational confirmation; not a blind atmospheric discovery or external novelty review"
+}
