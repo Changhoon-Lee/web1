@@ -30,8 +30,7 @@ theorem valuation_one_deficit_identity
     intro h
     apply hthree
     linarith
-  field_simp [hx, hthree, hthree']
-  nlinarith [mul_inv_cancel₀ hthree']
+  field_simp [hx, hthree, hthree'] <;> ring_nf
 
 /-- Exact lower surplus obtained when the terminal odd continuation is at most
 `(3x+1)/4`. -/
