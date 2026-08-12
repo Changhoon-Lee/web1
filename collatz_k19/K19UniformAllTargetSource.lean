@@ -117,8 +117,19 @@ theorem exists_nonperiodic_principal_separated_source
     hreach, ?_⟩
   exact separatedFromOne_of_reaches hreach hseparated
 
+/-- Audited gate alias: here “counterexample” means a target in a component
+separated from the known component of one in both directions. -/
+theorem exists_nonperiodic_principal_counterexample_source
+    {target : Nat} (htarget : 0 < target) (hmod : target % 3 ≠ 0)
+    (hseparated : SeparatedFromOne target) :
+    ∃ (index : PrincipalIndex 19) (source : Nat),
+      AdmissibleTarget 19 (residue index) source ∧
+      Reaches source target ∧ SeparatedFromOne source :=
+  exists_nonperiodic_principal_separated_source htarget hmod hseparated
+
 #print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.uniform_all_eligible_target_source_ratio_bound
 #print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.exists_nonperiodic_principal_separated_source
+#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.exists_nonperiodic_principal_counterexample_source
 
 end K19UniformAllTargetSource
 end KrasikovLagarias
