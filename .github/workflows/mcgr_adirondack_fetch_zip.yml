@@ -1,0 +1,51 @@
+name: MCGR Adirondack official ZIP source fetch
+
+on:
+  push:
+    branches: [ncs-multimode-coherence-prereg-20260812]
+    paths: ['.github/workflows/mcgr_adirondack_fetch_zip.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch official Middlebury Adirondack-perfect ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source tmp
+          url='https://vision.middlebury.edu/stereo/data/scenes2014/zip/Adirondack-perfect.zip'
+          curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 \
+            --user-agent 'Mozilla/5.0 (X11; Linux x86_64) MCGR-reproducibility/1.0' \
+            --referer 'https://vision.middlebury.edu/stereo/data/scenes2014/' \
+            "$url" -o tmp/Adirondack-perfect.zip
+          test "$(wc -c < tmp/Adirondack-perfect.zip)" -gt 90000000
+          unzip -q tmp/Adirondack-perfect.zip -d tmp/extracted
+          root=$(find tmp/extracted -type f -name im0.png -printf '%h\n' | head -1)
+          test -n "$root"
+          for f in im0.png im1.png disp0.pfm calib.txt; do
+            cp "$root/$f" "source/$f"
+            test -s "source/$f"
+          done
+          sha256sum tmp/Adirondack-perfect.zip > source/ZIP_SHA256.txt
+          sha256sum source/im0.png source/im1.png source/disp0.pfm source/calib.txt > source/SHA256SUMS.txt
+          stat -c '%n %s' source/im0.png source/im1.png source/disp0.pfm source/calib.txt > source/SIZES.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('source/disp0.pfm')
+          with p.open('rb') as f:
+              lines=[f.readline().decode('ascii').strip() for _ in range(3)]
+          Path('source/PFM_HEADER.txt').write_text('\n'.join(lines)+'\n')
+          if lines[0] not in {'Pf','PF'}:
+              raise SystemExit('bad PFM magic')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcgr-adirondack-official-source
+          path: source
+          if-no-files-found: error
+          retention-days: 90
