@@ -1,0 +1,37 @@
+name: FCPL immutable PhysioNet MIT-BIH 100 fetch
+
+on:
+  push:
+    branches: [ncs-factorization-complete-phase-20260813]
+    paths: ['.github/workflows/fcpl_mitbih100_source_fetch.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch official PhysioNet record 100
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source
+          base='https://physionet.org/files/mitdb/1.0.0'
+          for f in 100.hea 100.dat; do
+            curl --fail --location --retry 8 --retry-all-errors --connect-timeout 30 \
+              "$base/$f" -o "source/$f"
+            test -s "source/$f"
+          done
+          sha256sum source/100.hea source/100.dat > source/SHA256SUMS.txt
+          stat -c '%n %s' source/100.hea source/100.dat > source/SIZES.txt
+          file source/100.hea source/100.dat > source/FILE_METADATA.txt
+          cp source/100.hea source/HEADER_RECEIPT.txt
+          printf '%s\n' "$base" > source/SOURCE_BASE_URL.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fcpl-mitbih100-official-source
+          path: source
+          if-no-files-found: error
+          retention-days: 90
