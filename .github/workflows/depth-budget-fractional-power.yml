@@ -57,6 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          mkdir -p .lake/build/lib/lean
           lake env lean DepthBudgetRetarded.lean \
             -o .lake/build/lib/lean/DepthBudgetRetarded.olean \
             -i .lake/build/lib/lean/DepthBudgetRetarded.ilean \
