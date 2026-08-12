@@ -1,0 +1,31 @@
+{
+  "schema":"SCMC_MICROANEURYSM_CONFIRMATORY_RESULT_COMMITMENT_V1",
+  "design_commit":"2ae98e6ac782a061027d62707130654feb1343d1",
+  "prediction_commit":"c9f4e6fc0f698ac1afb71b70544e9578f500fd96",
+  "mode_hash_amendment_commit":"07d26cfc3a41f8fc934dde5c5471793a63f96bb5",
+  "v1_failure_commit":"b7d94d0b5430bae58cad76a4a5cd02a5b85d8fa6",
+  "prediction_payload_sha256":"4f06e57bfb71dc1f192a2b7a6f68aefadb47eba1f2b7d8876abf9ea83f15cf1b",
+  "result_payload_sha256":"cc30929b72176b923db3f8846ae5126e7245a7c605f972c21f62e599c4bb9d4e",
+  "result_file_sha256":"54f98d6715e7c36a2df45f602a70fddc7ead90e5e3d8dee7c20a25b475e6d197",
+  "history_file_sha256":"e998b630bf7884670c7906274f7ead223f713d146d03c32ecb35a9ece727490b",
+  "operator_sha256":"f402f6211d8d7199c78eac73fb682e455da865759657a1ca4c94b6a1a3180f60",
+  "all_original_scientific_gates_pass":true,
+  "observed":{
+    "factor_components_before":[256,256],
+    "factor_components_after_bridge":[512],
+    "weighted_closure_gap":3.5336186773906584e-05,
+    "weighted_identity_relative_error":3.0899761915836876e-18,
+    "sharp_gap_equality_residual":2.425902360936316e-18,
+    "safe_rho":0.9575639791767603,
+    "fail_rho":1.0424686141920119,
+    "repair_rho":0.9800000000000006,
+    "rho_at_repair_plus_1e_minus_7":0.9800001198856017,
+    "safe_final_G_relative_error":1.7317827305629383e-09,
+    "repair_final_G_relative_error":3.076593950580313e-09,
+    "fail_growth":64.01751992323975,
+    "predicted_fail_growth":64.01751992324107,
+    "dominant_rate_relative_error":1.0649941969578228e-15,
+    "native_max_relative_error":9.070841223583925e-09
+  },
+  "authority":"externally timestamped theorem-to-workflow computational confirmation after a transparently retained evaluator-code failure; not a blind medical discovery, external human proof review, or external novelty review"
+}
