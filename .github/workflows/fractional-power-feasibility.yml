@@ -40,14 +40,14 @@ jobs:
           build: false
           test: false
           use-github-cache: false
-      - name: Fetch pinned dependencies and build retarded core
+      - name: Fetch pinned dependencies and build elimination trace
         working-directory: source
         shell: bash
         run: |
           set -euxo pipefail
           lake update
           lake exe cache get
-          lake build Erdos1135.KrasikovLagarias.Retarded \
+          lake build Erdos1135.KrasikovLagarias.EliminationTrace \
             2>&1 | tee ../logs/dependencies.out
           grep -q 'Build completed successfully' ../logs/dependencies.out
       - name: Compile theorem and audit axioms
