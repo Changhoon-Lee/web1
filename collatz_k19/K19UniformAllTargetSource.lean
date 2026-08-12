@@ -11,10 +11,11 @@ constant is still uniform: every positive target not divisible by three has a
 nonperiodic principal source reaching it, and the same constant applies after
 normalization by that source.
 
-This module also records the counterexample transfer needed in a global
-Collatz argument: if the downstream target does not reach one, neither can any
-source that reaches it.  Consequently every eligible counterexample can be
-rooted at a nonperiodic principal source without losing badness.
+For a global counterexample argument the correct invariant is separation from
+the known component containing one in both reachability directions.  Such
+separation propagates backwards to every source reaching the target.  Hence an
+eligible separated component can be rooted at a nonperiodic principal source
+without losing the component obstruction.
 -/
 
 namespace Erdos1135
@@ -26,14 +27,25 @@ open K19CriticalChoice
 open K19UniformMovingTarget
 open Terras
 
-/-- Failure to reach one propagates backwards along reachability. -/
-def AvoidsOne (target : Nat) : Prop := ¬ Reaches target 1
+/-- A target lies outside the known component of one in both reachability
+directions. -/
+def SeparatedFromOne (target : Nat) : Prop :=
+  ¬ Reaches target 1 ∧ ¬ Reaches 1 target
 
-theorem avoidsOne_of_reaches
+/-- Separation from the component of one propagates backwards along
+reachability.  The first half uses deterministic-orbit comparability; the
+second half is direct transitivity. -/
+theorem separatedFromOne_of_reaches
     {source target : Nat} (hreach : Reaches source target)
-    (htarget : AvoidsOne target) : AvoidsOne source := by
-  intro hsourceOne
-  exact htarget (hreach.trans hsourceOne)
+    (htarget : SeparatedFromOne target) : SeparatedFromOne source := by
+  constructor
+  · intro hsourceOne
+    rcases reaches_or_reaches_of_common_source hreach hsourceOne with
+      htargetOne | honeTarget
+    · exact htarget.1 htargetOne
+    · exact htarget.2 honeTarget
+  · intro honeSource
+    exact htarget.2 (honeSource.trans hreach)
 
 /-- One uniform K19 constant works for every eligible target after normalizing
 by a nonperiodic principal source reaching that target.  Unlike the stronger
@@ -86,16 +98,16 @@ theorem uniform_all_eligible_target_source_ratio_bound :
   rw [gamma14551] at hdrop hraw
   exact hdrop.trans hraw
 
-/-- Every eligible counterexample has a nonperiodic principal counterexample
-source reaching it.  This removes a separate periodic-component branch from
-the later mass argument; the source size is intentionally retained as part of
-the state. -/
-theorem exists_nonperiodic_principal_counterexample_source
+/-- Every eligible target in a component separated from one has a
+nonperiodic principal source in the same separated component.  This removes a
+separate periodic-component branch from the later occupation argument; the
+source size is intentionally retained as part of the state. -/
+theorem exists_nonperiodic_principal_separated_source
     {target : Nat} (htarget : 0 < target) (hmod : target % 3 ≠ 0)
-    (hbad : AvoidsOne target) :
+    (hseparated : SeparatedFromOne target) :
     ∃ (index : PrincipalIndex 19) (source : Nat),
       AdmissibleTarget 19 (residue index) source ∧
-      Reaches source target ∧ AvoidsOne source := by
+      Reaches source target ∧ SeparatedFromOne source := by
   obtain ⟨source, hsourcePos, hsourceMod, hsourceNonperiodic, hreach⟩ :=
     exists_nonperiodic_mod_two_reaches_of_pos_mod_three_ne_zero htarget hmod
   obtain ⟨index, hsourceResidue⟩ :=
@@ -103,10 +115,10 @@ theorem exists_nonperiodic_principal_counterexample_source
   refine ⟨index, source,
     ⟨hsourcePos, hsourceResidue, hsourceNonperiodic⟩,
     hreach, ?_⟩
-  exact avoidsOne_of_reaches hreach hbad
+  exact separatedFromOne_of_reaches hreach hseparated
 
 #print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.uniform_all_eligible_target_source_ratio_bound
-#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.exists_nonperiodic_principal_counterexample_source
+#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.exists_nonperiodic_principal_separated_source
 
 end K19UniformAllTargetSource
 end KrasikovLagarias
