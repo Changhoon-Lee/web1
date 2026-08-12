@@ -61,9 +61,7 @@ theorem coefficientValue_rpow_le {index : Type*}
       rw [Real.mul_rpow (hcoefficients index)
         (Real.rpow_nonneg hlambda.le shift)]
       rw [← Real.rpow_mul hlambda.le, ← Real.rpow_mul hlambda.le]
-      congr 1
-      · exact le_rfl
-      · ring
+      exact le_rfl
   | add left right ihLeft ihRight =>
       simp only [Expr.coefficientValue]
       have hleft := coefficientValue_nonneg left coefficients
