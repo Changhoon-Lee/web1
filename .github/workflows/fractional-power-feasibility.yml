@@ -19,7 +19,7 @@ env:
 jobs:
   lean-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - name: Prepare pinned Lean project
@@ -40,13 +40,16 @@ jobs:
           build: false
           test: false
           use-github-cache: false
-      - name: Fetch pinned dependencies
+      - name: Fetch pinned dependencies and build retarded core
         working-directory: source
         shell: bash
         run: |
           set -euxo pipefail
           lake update
           lake exe cache get
+          lake build Erdos1135.KrasikovLagarias.Retarded \
+            2>&1 | tee ../logs/dependencies.out
+          grep -q 'Build completed successfully' ../logs/dependencies.out
       - name: Compile theorem and audit axioms
         working-directory: source
         shell: bash
@@ -59,7 +62,7 @@ jobs:
           grep -q 'coefficientValue_rpow_le' ../logs/lean.out
           grep -q 'feasible_poweredCoefficients' ../logs/lean.out
           printf '%s\n' \
-            'RETADED_EXPR_CONCAVE_POWER_TRANSPORT=PASS' \
+            'RETARDED_EXPR_CONCAVE_POWER_TRANSPORT=PASS' \
             'FRACTIONAL_POWER_FEASIBILITY=PASS' \
             'NO_SORRYAX=PASS' \
             'FORMAL_GATE=PASS' \
