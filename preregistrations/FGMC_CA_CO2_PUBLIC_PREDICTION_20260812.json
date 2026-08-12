@@ -1,0 +1,67 @@
+{
+  "design_commit": "68bf468d8fd47c239a27f384f10d912e546d4866",
+  "family": {
+    "closure_residuals": {
+      "bridge_commutator_fro": 2.8284271247461903,
+      "full_BHMC_defect": 0.15964850858648247,
+      "mixing": 5.051305425036645e-17,
+      "physics": 1.2304708753934601e-17
+    },
+    "dimension": 104,
+    "direct_native_metrics": {
+      "fail": {
+        "level_RMSE_ppm": 3.584745939857499,
+        "level_RMSE_standardized": 0.3320374400927922,
+        "weekly_difference_RMSE_ppm": 0.3708051469446203,
+        "weekly_difference_RMSE_standardized": 0.7837988151272248
+      },
+      "fail_stationary_residual": 2.0210187073335518e-16,
+      "safe": {
+        "level_RMSE_ppm": 4.27633262811746,
+        "level_RMSE_standardized": 0.3960957241175779,
+        "weekly_difference_RMSE_ppm": 0.4600993610388931,
+        "weekly_difference_RMSE_standardized": 0.9725467324134446
+      },
+      "safe_stationary_residual": 3.2925439812484974e-16
+    },
+    "factor_components_after_bridge": [104],
+    "factor_components_before": [52, 52],
+    "factor_count": 312,
+    "factor_list_sha256": "dd9634a384dffe67577b66ab6dd9a8a5ae1805a0aa6b9d0241b08057786be1da",
+    "fail_fixed_point_sha256": "442ac42e201e2bac82a9812854454be59247e48fa05984cd5f72b1a9ec8cab9a",
+    "family": "Mauna_Loa_CO2_seasonal_two_channel_estimation",
+    "fixed_point_tolerance": 5e-06,
+    "forcing_sha256": "9b7656a12662559e1eba939b0377dbacc62fa5850898d6f555a0f529f10e5cab",
+    "input_sha256": "88ee27c86ffb40886e793eb506cad836ed05c252fd6bfa094a71d98ba1033d57",
+    "nodes": 52,
+    "operator_sha256": "1a02ded9ef99b79faf483dc27f09763fa56a75a67d926d2734d76b812b355436",
+    "prediction": {
+      "beta_fail": 1.1861571368727846,
+      "beta_safe": 0.7907714245818565,
+      "beta_star": 0.9884642807273205,
+      "beta_star_interval": [0.9884642807273204, 0.9884642807273206],
+      "boundary_branch": "-1",
+      "chebyshev_c": 1.5012363175026981,
+      "chebyshev_certified_bound_at_budget": 1.811782317448703e-10,
+      "chebyshev_iteration_budget": 24,
+      "chebyshev_min_degree_for_tolerance": 14,
+      "dominant_eigenvalue": -1.3256320645390967,
+      "dominant_vector_sha256": "52f39758fbe4cce7b57eca09ded9a1f1fe2de4d8bb64fa9467c7245e62566796",
+      "fail_iteration_budget": 43,
+      "fail_rho": 1.3256320645390964,
+      "fail_spectral_interval": [-1.3256320645390964, 0.5339539715864868],
+      "predicted_fail_growth": 183733.7812856403,
+      "safe_rho": 0.6772087372312976,
+      "safe_spectral_interval": [-0.6772087372312976, 0.6474348034081054],
+      "scalar_iteration_budget": 41,
+      "scalar_repair_alpha": 0.7164149781627244,
+      "scalar_repair_rate": 0.6661176447313084
+    },
+    "preprocessed_sha256": "fa03759ab5d46b4d8b4bd0750930907e6b1b0e30df4cc146d4e60791f4a5e835",
+    "safe_fixed_point_sha256": "7727d50912a70a5c63e6384b2bdbdb29169af20ba4015954a9b4dac0c5e47295",
+    "split": {"heldout": 686, "total": 2284, "training": 1598}
+  },
+  "prediction_payload_sha256": "f6ef7ded24483f5cd4dbba7306eb35c6a4f2ef48ddc228e25aa8ade55e2f9bb9",
+  "schema": "FGMC_CO2_PUBLIC_PREDICTION_COMMITMENT_V1",
+  "trajectory_executed": false
+}
