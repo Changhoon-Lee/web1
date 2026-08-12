@@ -27,6 +27,41 @@ open K19CriticalChoice
 open K19UniformMovingTarget
 open Terras
 
+/-- Deterministic-orbit comparability, included locally so this source-normalized
+wrapper does not depend on the separate antichain overlay. -/
+private theorem reaches_or_reaches_of_common_source_local
+    {source first second : Nat}
+    (hfirst : Reaches source first)
+    (hsecond : Reaches source second) :
+    Reaches first second ∨ Reaches second first := by
+  rcases hfirst with ⟨firstSteps, hfirst⟩
+  rcases hsecond with ⟨secondSteps, hsecond⟩
+  rcases le_total firstSteps secondSteps with hsteps | hsteps
+  · left
+    refine ⟨secondSteps - firstSteps, ?_⟩
+    calc
+      accelerated^[secondSteps - firstSteps] first =
+          accelerated^[secondSteps - firstSteps]
+            (accelerated^[firstSteps] source) := by rw [hfirst]
+      _ = accelerated^[(secondSteps - firstSteps) + firstSteps] source := by
+        rw [Function.iterate_add_apply]
+      _ = accelerated^[secondSteps] source := by
+        congr 2
+        omega
+      _ = second := hsecond
+  · right
+    refine ⟨firstSteps - secondSteps, ?_⟩
+    calc
+      accelerated^[firstSteps - secondSteps] second =
+          accelerated^[firstSteps - secondSteps]
+            (accelerated^[secondSteps] source) := by rw [hsecond]
+      _ = accelerated^[(firstSteps - secondSteps) + secondSteps] source := by
+        rw [Function.iterate_add_apply]
+      _ = accelerated^[firstSteps] source := by
+        congr 2
+        omega
+      _ = first := hfirst
+
 /-- A target lies outside the known component of one in both reachability
 directions. -/
 def SeparatedFromOne (target : Nat) : Prop :=
@@ -40,7 +75,7 @@ theorem separatedFromOne_of_reaches
     (htarget : SeparatedFromOne target) : SeparatedFromOne source := by
   constructor
   · intro hsourceOne
-    rcases reaches_or_reaches_of_common_source hreach hsourceOne with
+    rcases reaches_or_reaches_of_common_source_local hreach hsourceOne with
       htargetOne | honeTarget
     · exact htarget.1 htargetOne
     · exact htarget.2 honeTarget
@@ -127,9 +162,9 @@ theorem exists_nonperiodic_principal_counterexample_source
       Reaches source target ∧ SeparatedFromOne source :=
   exists_nonperiodic_principal_separated_source htarget hmod hseparated
 
-#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.uniform_all_eligible_target_source_ratio_bound
-#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.exists_nonperiodic_principal_separated_source
-#print axioms Erdos1135.KrasikovLagarias.K19UniformAllTargetSource.exists_nonperiodic_principal_counterexample_source
+#print axioms Erdos1135.KrasikovLagias.K19UniformAllTargetSource.uniform_all_eligible_target_source_ratio_bound
+#print axioms Erdos1135.KrasikovLagias.K19UniformAllTargetSource.exists_nonperiodic_principal_separated_source
+#print axioms Erdos1135.KrasikovLagias.K19UniformAllTargetSource.exists_nonperiodic_principal_counterexample_source
 
 end K19UniformAllTargetSource
 end KrasikovLagarias
