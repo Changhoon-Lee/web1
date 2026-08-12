@@ -22,11 +22,11 @@ theorem valuation_one_deficit_identity
     {x : ℝ} (hx : x ≠ 0) (hthree : 3 * x + 1 ≠ 0) :
     1 / x - (1 / (3 * x + 1) + 1 / ((3 * x + 1) / 2)) =
       1 / (x * (3 * x + 1)) := by
-  have hthree' : 1 + x * 3 ≠ 0 := by
-    intro h
-    apply hthree
-    linarith
-  field_simp [hx, hthree, hthree']
+  have hshortcut :
+      1 / ((3 * x + 1) / 2) = 2 / (3 * x + 1) := by
+    field_simp [hthree]
+  rw [hshortcut]
+  field_simp [hx, hthree]
   ring
 
 /-- Exact lower surplus obtained when the terminal odd continuation is at most
@@ -35,11 +35,11 @@ theorem terminal_four_surplus_identity
     {x : ℝ} (hx : x ≠ 0) (hthree : 3 * x + 1 ≠ 0) :
     1 / (3 * x + 1) + 1 / ((3 * x + 1) / 4) - 1 / x =
       (2 * x - 1) / (x * (3 * x + 1)) := by
-  have hthree' : 1 + x * 3 ≠ 0 := by
-    intro h
-    apply hthree
-    linarith
-  field_simp [hx, hthree, hthree']
+  have hshortcut :
+      1 / ((3 * x + 1) / 4) = 4 / (3 * x + 1) := by
+    field_simp [hthree]
+  rw [hshortcut]
+  field_simp [hx, hthree]
   ring
 
 /-- The terminal lower surplus dominates the simple scale bound used in the
