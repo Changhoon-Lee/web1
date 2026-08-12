@@ -1,0 +1,32 @@
+{
+  "design_commit":"e2147a47968a400c23b4f9d917d1c2aa4cf540a7",
+  "prediction_payload_sha256":"d60335f343892b2334d96eab5d8d23a4ef780f259fe061984d4b4d7748db6f05",
+  "public_payload_sha256":"942dda57c385a0d2883c2b0196e83ca7d315ab467e36ee0ef11375f965220923",
+  "trajectory_executed":false,
+  "family":{
+    "name":"F4_Sunspot_solar_cycle_state_estimation",
+    "dimension":22,
+    "input_sha256":"b5c7644a73c1e0c5fbb92d29fa885ed2f4b286745dda86612e96f981ccb706cc",
+    "preprocessed_sha256":"ac0625ad673bf85bd86f4fc7bbd84b4046519cede142ad90b8209c76aa330745",
+    "operator_sha256":"927a2ad159621690449d1b285224f950d76efac1e743f2b22f93b763ab8fc870",
+    "full_BHMC_defect":0.08989331499509895,
+    "PAMC_mixing_residual":4.32679809193683e-17,
+    "PAMC_physics_residual":0.0,
+    "beta_star_interval":[1.812993005972876,1.8129930059728765],
+    "boundary_branch":"-1",
+    "beta_safe":1.450394404778301,
+    "safe_rho":0.6964824049354107,
+    "beta_fail":2.1755916071674513,
+    "fail_rho":1.3056200125957715,
+    "dominant_eigenvalue":-1.3056200125957715,
+    "dominant_vector_sha256":"47903419288a82ec120f0cac5f4048a7ba4d2be58256a72ee57b81308a1f30a1",
+    "repair_alpha":0.6296892275119769,
+    "repair_rate":0.45182408466758595,
+    "iteration_budgets":{"safe":44,"fail":45,"repair":26,"fixed_point_tolerance":5e-6},
+    "predicted_fail_growth":162838.0621692866,
+    "forcing_sha256":"d87a8660dfbd1ee5ddf237b4cac763ceb8c9cb837ddeebf838df3f86c77e4232",
+    "direct_fail_fixed_point_sha256":"eea4be1b0d7a6016f741f97302b1f3d979e3d32dd90a8deb448146c0e3444878",
+    "symmetry_breaker_commutator_fro":1.4142135623730951
+  },
+  "schema":"PAMC_F4_PUBLIC_PREDICTION_COMMITMENT_V1"
+}
