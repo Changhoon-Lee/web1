@@ -1,0 +1,39 @@
+name: FPPL immutable PIV source fetch v2
+
+on:
+  push:
+    branches: [ncs-factor-provenance-prereg-20260813]
+    paths: ['.github/workflows/fppl_piv_source_fetch_v2.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    env:
+      DATA_COMMIT: 2cdc5ce89b334d28f06a58c9f0ca21aa6992a5ba
+    steps:
+      - name: Fetch immutable scikit-image PIV Challenge files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source
+          base="https://gitlab.com/scikit-image/data/-/raw/${DATA_COMMIT}/pivchallenge/B"
+          for pair in 'B001_1.tif pivchallenge-B-B001_1.tif' 'B001_2.tif pivchallenge-B-B001_2.tif'; do
+            set -- $pair
+            curl --fail --location --retry 8 --retry-all-errors --connect-timeout 30 \
+              "$base/$1" -o "source/$2"
+            test -s "source/$2"
+          done
+          sha256sum source/*.tif > source/SHA256SUMS.txt
+          stat -c '%n %s' source/*.tif > source/SIZES.txt
+          file source/*.tif > source/FILE_METADATA.txt
+          printf '%s\n' "$DATA_COMMIT" > source/SCIKIT_IMAGE_DATA_COMMIT.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fppl-piv-immutable-source-v2
+          path: source
+          if-no-files-found: error
+          retention-days: 90
