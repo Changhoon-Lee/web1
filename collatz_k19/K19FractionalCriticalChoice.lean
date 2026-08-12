@@ -5,18 +5,18 @@ import Erdos1135.KrasikovLagarias.K19CriticalChoice
 # Fractional-power family of K19 adaptive envelopes
 
 The authenticated K19 coefficient vector is feasible at
-`lambda14551 = 2^(14551/16000)`.  Concave fractional-power transport produces,
+`lambda14551 = 2^(14551/16000)`. Concave fractional-power transport produces,
 for every `0 < p ≤ 1`, a new feasible vector
 
 `index ↦ k19PrincipalWeights index ^ p`
 
-at base `lambda14551 ^ p`.  Feeding that vector back into the same adaptive
+at base `lambda14551 ^ p`. Feeding that vector back into the same adaptive
 critical-tree theorem gives a continuum of K19 predecessor envelopes at
 exponent `p * 14551/16000`.
 
-The concrete fifth-root member has exponent `14551/80000` and substantially
-compresses the certificate's coefficient dynamic range.  This is the formal
-source-system half of the same-potential bad-spine/K19 normalization bridge.
+The concrete fourth-root member has exponent `14551/64000` and is the strongest
+simple fractional member for which the global coefficient-range bound still
+leaves a strictly positive sixteen-side same-potential factor.
 -/
 
 namespace Erdos1135
@@ -28,6 +28,10 @@ open EliminationSourceSystem
 open FractionalPowerFeasibility
 open K19CriticalChoice
 open K19SourceBridge
+open Retarded
+
+local instance principalIndexNonempty : Nonempty (PrincipalIndex 19) :=
+  ⟨⟨0, by norm_num [principalCount]⟩⟩
 
 noncomputable def fractionalWeights (p : Real) : PrincipalIndex 19 → Real :=
   poweredCoefficients k19PrincipalWeights p
@@ -82,39 +86,43 @@ theorem phiValues19_fractional_exponential_lower_bound
     (fractionalSourceSystem_isFeasible hp.le hpOne)
     (fractionalWeights_pos p) one_le_phiValues19_zero
 
-noncomputable def fifthWeights : PrincipalIndex 19 → Real :=
-  fractionalWeights ((1 : Real) / 5)
+noncomputable def fourthWeights : PrincipalIndex 19 → Real :=
+  fractionalWeights ((1 : Real) / 4)
 
-noncomputable def fifthLambda : Real :=
-  fractionalLambda ((1 : Real) / 5)
+noncomputable def fourthLambda : Real :=
+  fractionalLambda ((1 : Real) / 4)
 
-noncomputable def fifthGamma : Real :=
-  fractionalGamma ((1 : Real) / 5)
-
-@[simp]
-theorem fifthGamma_eq :
-    fifthGamma = (14551 : Real) / 80000 := by
-  norm_num [fifthGamma, fractionalGamma, gamma14551]
+noncomputable def fourthGamma : Real :=
+  fractionalGamma ((1 : Real) / 4)
 
 @[simp]
-theorem fifthLambda_eq_two_rpow :
-    fifthLambda = (2 : Real) ^ ((14551 : Real) / 80000) := by
-  simpa [fifthLambda, fifthGamma_eq] using
-    fractionalLambda_eq_two_rpow ((1 : Real) / 5)
+theorem fourthGamma_eq :
+    fourthGamma = (14551 : Real) / 64000 := by
+  norm_num [fourthGamma, fractionalGamma, gamma14551]
 
-/-- Concrete fifth-root K19 envelope used by the normalization breakthrough. -/
-theorem phiValues19_fifth_exponential_lower_bound :
+@[simp]
+theorem fourthLambda_eq_two_rpow :
+    fourthLambda = (2 : Real) ^ ((14551 : Real) / 64000) := by
+  change fractionalLambda ((1 : Real) / 4) =
+    (2 : Real) ^ ((14551 : Real) / 64000)
+  rw [fractionalLambda_eq_two_rpow]
+  rw [show fractionalGamma ((1 : Real) / 4) =
+      (14551 : Real) / 64000 by
+    norm_num [fractionalGamma, gamma14551]]
+
+/-- Concrete fourth-root K19 envelope used by the normalization breakthrough. -/
+theorem phiValues19_fourth_exponential_lower_bound :
     ∃ constant : Real, 0 < constant ∧
       ∀ index y, 0 ≤ y →
-        constant * fifthWeights index * fifthLambda ^ y ≤
+        constant * fourthWeights index * fourthLambda ^ y ≤
           phiValues19 index y := by
-  simpa [fifthWeights, fifthLambda] using
+  simpa [fourthWeights, fourthLambda] using
     phiValues19_fractional_exponential_lower_bound
-      (p := (1 : Real) / 5) (by norm_num) (by norm_num)
+      (p := (1 : Real) / 4) (by norm_num) (by norm_num)
 
 #print axioms Erdos1135.KrasikovLagarias.K19FractionalCriticalChoice.fractionalSourceSystem_isFeasible
 #print axioms Erdos1135.KrasikovLagarias.K19FractionalCriticalChoice.phiValues19_fractional_exponential_lower_bound
-#print axioms Erdos1135.KrasikovLagarias.K19FractionalCriticalChoice.phiValues19_fifth_exponential_lower_bound
+#print axioms Erdos1135.KrasikovLagarias.K19FractionalCriticalChoice.phiValues19_fourth_exponential_lower_bound
 
 end K19FractionalCriticalChoice
 end KrasikovLagarias
