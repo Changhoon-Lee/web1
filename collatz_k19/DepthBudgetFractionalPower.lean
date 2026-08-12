@@ -6,9 +6,9 @@ import Mathlib.Analysis.MeanInequalitiesPow
 
 The depth-budgeted retarded expression has the same addition/minimum
 coefficient algebra as the ordinary retarded expression; each leaf merely
-carries an extra natural cost.  Consequently concave fractional-power transport
-preserves every coefficient inequality while leaving all leaf costs and Bounds
-certificates unchanged.
+carries an extra natural cost. Consequently concave fractional-power transport
+preserves every coefficient inequality while leaving all leaf costs, Bounds
+certificates, and arbitrary expression-side properties unchanged.
 
 This is the abstract depth half needed by the fractional K19 first-hit fibre
 program: the exponent and coefficient dynamic range may be changed without
@@ -110,28 +110,29 @@ theorem coefficientValue_rpow_le {index : Type*}
         · exact (Real.rpow_le_rpow hright hle hp).trans ihLeft
         · exact ihRight
 
-/-- A choice-valued depth system keeps exactly the same expression and Bounds
-certificate after fractional-power transport. -/
+/-- A choice-valued depth system keeps exactly the same expression, Bounds
+certificate, and arbitrary side property after fractional-power transport. -/
 theorem choice_poweredCoefficients {index : Type*}
     (coefficients : index → ℝ) {lambda p mu nu : ℝ} {maxCost : ℕ}
+    (property : index → ℝ → ℕ → Expr index → Prop)
     (hcoefficients : ∀ index, 0 ≤ coefficients index)
     (hlambda : 0 < lambda) (hp : 0 ≤ p) (hpOne : p ≤ 1)
     (choice : ∀ i y budget, nu ≤ y → maxCost ≤ budget →
       ∃ expr : Expr index,
         expr.Bounds mu nu maxCost ∧
           coefficients i ≤ expr.coefficientValue coefficients lambda ∧
-          True) :
+          property i y budget expr) :
     ∀ i y budget, nu ≤ y → maxCost ≤ budget →
       ∃ expr : Expr index,
         expr.Bounds mu nu maxCost ∧
           poweredCoefficients coefficients p i ≤
             expr.coefficientValue (poweredCoefficients coefficients p)
               (lambda ^ p) ∧
-          True := by
+          property i y budget expr := by
   intro i y budget hy hbudget
-  obtain ⟨expr, hbounds, hcoefficient, htail⟩ :=
+  obtain ⟨expr, hbounds, hcoefficient, hproperty⟩ :=
     choice i y budget hy hbudget
-  refine ⟨expr, hbounds, ?_, htail⟩
+  refine ⟨expr, hbounds, ?_, hproperty⟩
   calc
     poweredCoefficients coefficients p i = coefficients i ^ p := rfl
     _ ≤ (expr.coefficientValue coefficients lambda) ^ p :=
