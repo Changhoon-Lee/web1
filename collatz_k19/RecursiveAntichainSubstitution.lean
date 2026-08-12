@@ -32,7 +32,8 @@ theorem unique_antichain_parent_of_common_predecessor
   rcases reaches_or_reaches_of_common_source hchildFirst hchildSecond with
       hforward | hbackward
   · exact (hantichain hfirst hsecond hne) hforward
-  · exact (hantichain hsecond hfirst hne.symm) hbackward
+  · have hneReverse : second ≠ first := fun h => hne h.symm
+    exact (hantichain hsecond hfirst hneReverse) hbackward
 
 /-- Fibrewise inverse-subtree substitution preserves a reachability antichain.
 The replacement fibres may have different depths and different shapes. -/
@@ -57,7 +58,8 @@ theorem fibered_predecessor_union_antichain
         (hchildReachesParent hx) hxReachesParentY with
       hforward | hbackward
     · exact (hparentAntichain (hparentMem hx) (hparentMem hy) hsame) hforward
-    · exact (hparentAntichain (hparentMem hy) (hparentMem hx) hsame.symm)
+    · have hsameReverse : parent y ≠ parent x := fun h => hsame h.symm
+      exact (hparentAntichain (hparentMem hy) (hparentMem hx) hsameReverse)
         hbackward
 
 #print axioms Erdos1135.KrasikovLagarias.unique_antichain_parent_of_common_predecessor
