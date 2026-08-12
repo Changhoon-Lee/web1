@@ -22,7 +22,11 @@ theorem valuation_one_deficit_identity
     {x : ℝ} (hx : x ≠ 0) (hthree : 3 * x + 1 ≠ 0) :
     1 / x - (1 / (3 * x + 1) + 1 / ((3 * x + 1) / 2)) =
       1 / (x * (3 * x + 1)) := by
-  field_simp
+  have hthree' : 1 + x * 3 ≠ 0 := by
+    intro h
+    apply hthree
+    linarith
+  field_simp [hx, hthree, hthree']
   ring
 
 /-- Exact lower surplus obtained when the terminal odd continuation is at most
@@ -31,7 +35,11 @@ theorem terminal_four_surplus_identity
     {x : ℝ} (hx : x ≠ 0) (hthree : 3 * x + 1 ≠ 0) :
     1 / (3 * x + 1) + 1 / ((3 * x + 1) / 4) - 1 / x =
       (2 * x - 1) / (x * (3 * x + 1)) := by
-  field_simp
+  have hthree' : 1 + x * 3 ≠ 0 := by
+    intro h
+    apply hthree
+    linarith
+  field_simp [hx, hthree, hthree']
   ring
 
 /-- The terminal lower surplus dominates the simple scale bound used in the
@@ -53,6 +61,7 @@ theorem deficit_denominator_ge_square
   nlinarith [sq_nonneg (A - 2)]
 
 #print axioms ValuationOneBlockAlgebra.valuation_one_deficit_identity
+#print axioms ValuationOneBlockAlgebra.terminal_four_surplus_identity
 #print axioms ValuationOneBlockAlgebra.terminal_surplus_ge_scale
 #print axioms ValuationOneBlockAlgebra.deficit_denominator_ge_square
 
