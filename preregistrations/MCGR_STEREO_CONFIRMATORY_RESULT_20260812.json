@@ -1,0 +1,51 @@
+{
+  "schema": "MCGR_STEREO_CONFIRMATORY_RESULT_COMMITMENT_V1",
+  "design_commit": "314f3d04281758464768a943f3196f31d9da163e",
+  "prediction_commit": "ec4cfff51a8a926e5124e81325689b7e9e51e3ae",
+  "prediction_payload_sha256": "1dc8b59470c7fd1c55a9b4bf141fcb4b4695adbd1c8d4ca158521e9ba057adee",
+  "operator_sha256": "11f965513d80a1d620999d7bcaa8b4f6931e9dfc0938ed63ce63a63553298a41",
+  "result_payload_sha256": "25493205e51e5b7322c620545692375fbef8b8266541a587b263e8a3add980ca",
+  "history_sha256": "8b9bb9f96cbbf7fc6715b5f9025b7373500ad4d47e8a9cc1093e499ef29cf7fd",
+  "all_original_gates_pass": true,
+  "observed": {
+    "safe": {
+      "iterations": 310,
+      "final_G_relative_error": 7.008726493434654e-09,
+      "stationary_residual": 6.565610965646316e-08,
+      "native_max_relative_error": 2.5269481800518717e-09
+    },
+    "fail": {
+      "iterations": 100,
+      "growth": 70.14070949234235,
+      "predicted_growth": 70.14070949234281,
+      "tail_rate": 1.0434213085263235,
+      "predicted_rate": 1.0434213085263235,
+      "rate_relative_error": 0.0,
+      "growth_relative_error": 6.483358297596183e-15
+    },
+    "repair": {
+      "iterations": 667,
+      "final_G_relative_error": 6.785642038424836e-09,
+      "stationary_residual": 6.38930365001621e-08,
+      "native_max_relative_error": 2.4321188157725667e-09,
+      "rho_at_alpha_repair_plus_1e_minus_7": 0.9800000834260711
+    }
+  },
+  "gates": {
+    "hashes": true,
+    "safe_fixed_point": true,
+    "safe_native": true,
+    "safe_stationary": true,
+    "safe_rho": true,
+    "fail_fixed_point": true,
+    "fail_growth": true,
+    "fail_rate": true,
+    "fail_rho": true,
+    "repair_fixed_point": true,
+    "repair_native": true,
+    "repair_stationary": true,
+    "repair_rho": true,
+    "repair_largest_local": true
+  },
+  "authority": "externally timestamped trajectory confirmation against the public frozen prediction; not a blind physical discovery, external proof review, external novelty review, or independent third-party replication"
+}
