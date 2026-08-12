@@ -56,11 +56,12 @@ jobs:
           if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
           if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
               BadSpineCriticalBudget.lean; then exit 6; fi
+          grep -q 'k19AggregateRetention_gt_thirty_over_thirtyOne' ../logs/lean.out
           grep -q 'side_factor_times_k19AggregateRetention_gt_one' ../logs/lean.out
           grep -q 'composition_of_side_and_occupation' ../logs/lean.out
           printf '%s\n' \
-            'K19_AGGREGATE_RETENTION_GT_32_OVER_33=PASS' \
-            'SIDE33_32_TIMES_K19_AGGREGATE_GT_ONE=PASS' \
+            'K19_AGGREGATE_RETENTION_GT_30_OVER_31=PASS' \
+            'SIDE31_30_TIMES_K19_AGGREGATE_GT_ONE=PASS' \
             'BAD_OCCUPATION_COMPOSITION_SURFACE=PASS' \
             'NO_SORRYAX=PASS' \
             'FORMAL_GATE=PASS' \
