@@ -6,6 +6,7 @@ on:
       - collatz-k19-gate-clean-20260808
     paths:
       - collatz_k19/K19UniformMovingTarget.lean
+      - collatz_k19/K19UniformAllTargetSource.lean
       - .github/workflows/k19-uniform-moving-target.yml
   workflow_dispatch:
 
@@ -63,7 +64,11 @@ jobs:
           collatz_k19/prepare_k19_exact_chunked_tree.sh source formal_tools "$WORK" \
             | tee logs/exact_tree.out
           cp collatz_k19/K19UniformMovingTarget.lean source/
-          sha256sum collatz_k19/K19UniformMovingTarget.lean | tee logs/source.sha256
+          cp collatz_k19/K19UniformAllTargetSource.lean source/
+          sha256sum \
+            collatz_k19/K19UniformMovingTarget.lean \
+            collatz_k19/K19UniformAllTargetSource.lean \
+            | tee logs/source.sha256
 
       - name: Install source-pinned Lean
         uses: leanprover/lean-action@v1
@@ -178,7 +183,7 @@ jobs:
           echo 'K19_GENERATED_CERTIFICATES=AUTHENTICATED_BINARY_IMPORTS' \
             | tee logs/frozen_boundaries.verdict
 
-      - name: Directly compile uniform moving-target theorem and audit axioms
+      - name: Directly compile uniform moving-target theorems and audit axioms
         working-directory: source
         shell: bash
         run: |
@@ -199,17 +204,26 @@ jobs:
           compile_module Erdos1135.KrasikovLagarias.K19CriticalChoice
           compile_module Erdos1135.KrasikovLagarias.K19PredecessorBridge
           compile_module K19UniformMovingTarget
+          compile_module K19UniformAllTargetSource
           if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
           if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
-              K19UniformMovingTarget.lean; then
+              K19UniformMovingTarget.lean K19UniformAllTargetSource.lean; then
             exit 6
           fi
           grep -q \
             'K19UniformMovingTarget.uniform_nonperiodic_target_ratio_bound' \
             ../logs/lean.out
+          grep -q \
+            'K19UniformAllTargetSource.uniform_all_eligible_target_source_ratio_bound' \
+            ../logs/lean.out
+          grep -q \
+            'K19UniformAllTargetSource.exists_nonperiodic_principal_counterexample_source' \
+            ../logs/lean.out
           printf '%s\n' \
             'K19_UNIFORM_PRINCIPAL_RATIO_BOUND=PASS' \
             'K19_UNIFORM_NONPERIODIC_MOVING_TARGET_BOUND=PASS' \
+            'K19_UNIFORM_ALL_ELIGIBLE_SOURCE_NORMALIZED_BOUND=PASS' \
+            'K19_COUNTEREXAMPLE_NONPERIODIC_SOURCE_REDUCTION=PASS' \
             'K19_MOVING_TARGET_AXIOM_AUDIT=PASS_NO_SORRYAX' \
             'FORMAL_GATE=PASS' \
             | tee ../logs/verdict.out
