@@ -1,0 +1,57 @@
+name: Inspect Depth-Budget Adaptive Surface
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - .github/workflows/inspect-depth-budget-adaptive-surface.yml
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+  FORMAL_TOOLS_SHA256: 53923fd035af8a5edd442bfb9dee583c0774e41de0899cc445e859fa7214e495
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract pinned source and reviewed overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source tools logs
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          base64 --decode collatz_k19/k19_formal_patch_tools.tar.gz.b64 > "$RUNNER_TEMP/tools.tar.gz"
+          echo "$FORMAL_TOOLS_SHA256  $RUNNER_TEMP/tools.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/tools.tar.gz" -C tools
+          chmod +x tools/*.py tools/*.sh
+          python3 tools/generate_k19_overlay_strict.py source | tee logs/overlay.out
+          {
+            for f in \
+              source/Erdos1135/KrasikovLagarias/AdaptiveCriticalChoice.lean \
+              source/Erdos1135/KrasikovLagarias/AdaptiveEliminationTree.lean \
+              source/Erdos1135/KrasikovLagarias/AdaptiveEliminationPolicy.lean \
+              source/Erdos1135/KrasikovLagarias/EliminationCriticalTree.lean \
+              source/Erdos1135/KrasikovLagarias/EliminationPolicy.lean \
+              source/Erdos1135/KrasikovLagarias/EliminationSourceSystem.lean \
+              source/Erdos1135/KrasikovLagarias/Retarded.lean; do
+              echo "===== $f ====="
+              if test -f "$f"; then sed -n '1,900p' "$f"; else echo MISSING; fi
+            done
+          } | tee logs/adaptive-surface.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: depth-budget-adaptive-surface-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
