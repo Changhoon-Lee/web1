@@ -1,0 +1,65 @@
+name: K19 Full-Lift Critical Bellman Frontier
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/k19_full_lift_critical_bellman_exact.cpp
+      - .github/workflows/k19-full-lift-critical-bellman.yml
+
+permissions:
+  contents: read
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile exact full-lift Bellman scanner
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs
+          g++ -O3 -march=native -fopenmp -std=c++20 \
+            collatz_k19/k19_full_lift_critical_bellman_exact.cpp \
+            -o "$RUNNER_TEMP/full_lift_bellman"
+          sha256sum \
+            collatz_k19/k19_full_lift_critical_bellman_exact.cpp \
+            "$RUNNER_TEMP/full_lift_bellman" \
+            | tee logs/scanner.sha256
+
+      - name: Scan all 3^18 states
+        shell: bash
+        env:
+          OMP_NUM_THREADS: 4
+        run: |
+          set -euxo pipefail
+          /usr/bin/time -v "$RUNNER_TEMP/full_lift_bellman" \
+            2>&1 | tee logs/full-lift-bellman.txt
+          grep -q '^ROWS=387420489$' logs/full-lift-bellman.txt
+          if grep -q '^FULL_LIFT_FIRST_STRICT_PASS_ONE=' \
+              logs/full-lift-bellman.txt; then
+            echo 'FULL_LIFT_BAD_COMPONENT_CRITICAL_FRONTIER_GT_ONE=PASS' \
+              | tee logs/verdict.out
+          elif grep -q '^FULL_LIFT_FIXED_POINT_BELOW_OR_EQUAL_ONE=' \
+              logs/full-lift-bellman.txt; then
+            echo 'FULL_LIFT_BAD_COMPONENT_CRITICAL_FRONTIER=EXACT_FAIL' \
+              | tee logs/verdict.out
+          else
+            echo 'FULL_LIFT_BAD_COMPONENT_CRITICAL_FRONTIER=OPEN_AT_LIMIT' \
+              | tee logs/verdict.out
+          fi
+
+      - name: Upload exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-full-lift-critical-bellman-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
