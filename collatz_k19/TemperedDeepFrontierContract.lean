@@ -26,6 +26,10 @@ noncomputable def frontierThreshold : ℝ :=
     sideFactor * frontierThreshold = 1 := by
   norm_num [sideFactor, frontierThreshold]
 
+@[simp] theorem frontierThreshold_mul_sideFactor :
+    frontierThreshold * sideFactor = 1 := by
+  norm_num [sideFactor, frontierThreshold]
+
 /-- The exact side factor strictly clears `8/7`. -/
 theorem sideFactor_gt_eight_sevenths :
     (8 : ℝ) / 7 < sideFactor := by
@@ -50,15 +54,21 @@ theorem composition_of_same_potential
     parentMass < frontierMass := by
   have hsidePositive : 0 < sideMass :=
     (mul_pos (by norm_num [sideFactor]) hparent).trans hside
+  have hthresholdPositive : 0 < frontierThreshold := by
+    norm_num [frontierThreshold]
+  have hscaledSide :
+      frontierThreshold * (sideFactor * parentMass) <
+        frontierThreshold * sideMass :=
+    mul_lt_mul_of_pos_left hside hthresholdPositive
+  have hparentBelowThresholdSide :
+      parentMass < frontierThreshold * sideMass := by
+    calc
+      parentMass = frontierThreshold * (sideFactor * parentMass) := by
+        rw [← mul_assoc, frontierThreshold_mul_sideFactor, one_mul]
+      _ < frontierThreshold * sideMass := hscaledSide
   have hthresholdScaled :
       frontierThreshold * sideMass < retention * sideMass :=
     mul_lt_mul_of_pos_right hretention hsidePositive
-  have hparentBelowThresholdSide :
-      parentMass < frontierThreshold * sideMass := by
-    have hpositiveThreshold : 0 < frontierThreshold := by
-      norm_num [frontierThreshold]
-    have hscaled := mul_lt_mul_of_pos_left hside hpositiveThreshold
-    simpa [sideFactor_mul_frontierThreshold, mul_assoc] using hscaled
   exact hparentBelowThresholdSide.trans
     (hthresholdScaled.trans_le hfrontier)
 
