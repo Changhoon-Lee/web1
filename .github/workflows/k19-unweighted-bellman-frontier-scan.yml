@@ -1,0 +1,41 @@
+name: K19 Unweighted Bellman Frontier Scan
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/k19_unweighted_bellman_frontier_scan.cpp
+      - .github/workflows/k19-unweighted-bellman-frontier-scan.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and scan coefficient-one adaptive frontier
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs
+          g++ -O3 -march=native -fopenmp -std=c++20 \
+            collatz_k19/k19_unweighted_bellman_frontier_scan.cpp \
+            -o "$RUNNER_TEMP/scan"
+          sha256sum \
+            collatz_k19/k19_unweighted_bellman_frontier_scan.cpp \
+            "$RUNNER_TEMP/scan" | tee logs/scanner.sha256
+          /usr/bin/time -v "$RUNNER_TEMP/scan" \
+            2>&1 | tee logs/unweighted-bellman-frontier.txt
+          grep -q '^ROWS=387420489$' logs/unweighted-bellman-frontier.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k19-unweighted-bellman-frontier-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
