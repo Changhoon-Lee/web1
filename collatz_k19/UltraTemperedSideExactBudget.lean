@@ -27,27 +27,46 @@ noncomputable def ultraTemperExponent : ℝ := (1 : ℝ) / 256
 
 /-- Exact integer certificate behind the `31/32` 256th-root ratio. -/
 theorem exact_weight_power_certificate :
-    (1497192 : ℕ) * 32 ^ (256 : ℕ) >
-      (4166117961 : ℕ) * 31 ^ (256 : ℕ) := by
+    (4166117961 : ℕ) * 31 ^ (256 : ℕ) <
+      (1497192 : ℕ) * 32 ^ (256 : ℕ) := by
   norm_num
 
 /-- Global K19 256th-root range ratio exceeds `31/32`. -/
 theorem ultra_tempered_weight_ratio_gt_thirtyOne_over_thirtyTwo :
     (31 : ℝ) / 32 <
       (weightMinimum / weightMaximum) ^ ultraTemperExponent := by
-  have hpositiveMin : 0 < weightMinimum := by norm_num [weightMinimum]
-  have hpositiveMax : 0 < weightMaximum := by norm_num [weightMaximum]
-  have hratioPositive : 0 < weightMinimum / weightMaximum :=
-    div_pos hpositiveMin hpositiveMax
-  have hthirtyOnePositive : 0 < (31 : ℝ) / 32 := by norm_num
-  apply (Real.lt_rpow_inv_iff_of_pos hthirtyOnePositive hratioPositive
-    (show (0 : ℝ) < (256 : ℝ) by norm_num)).2
-  norm_num [weightMinimum, weightMaximum]
-  exact_mod_cast exact_weight_power_certificate
+  have hminPositive : 0 < weightMinimum := by norm_num [weightMinimum]
+  have hmaxPositive : 0 < weightMaximum := by norm_num [weightMaximum]
+  have hratioNonnegative : 0 ≤ weightMinimum / weightMaximum :=
+    div_nonneg hminPositive.le hmaxPositive.le
+  have hbase :
+      ((31 : ℝ) / 32) ^ (256 : ℝ) <
+        weightMinimum / weightMaximum := by
+    norm_num [weightMinimum, weightMaximum]
+  have hroot :=
+    (Real.lt_rpow_inv_iff_of_pos
+      (by norm_num : 0 ≤ (31 : ℝ) / 32)
+      hratioNonnegative
+      (by norm_num : 0 < (256 : ℝ))).2 hbase
+  simpa [ultraTemperExponent, div_eq_mul_inv] using hroot
+
+/-- Exact geometric sum used by the sixteen-side certificate. -/
+theorem sixteen_geometric_sum_identity :
+    ∑ j ∈ Finset.range 16, ((2 : ℝ) / 3) ^ (j + 1) =
+      (85962370 : ℝ) / 43046721 := by
+  norm_num [Finset.sum_range_succ]
 
 /-- Exact conservative 1/256-tempered factor for the first sixteen side targets. -/
 noncomputable def ultraTemperedSixteenSideFactor : ℝ :=
   (30645584905 : ℝ) / 16529940864
+
+/-- Exact rational reconstruction of the conservative side factor. -/
+theorem ultra_tempered_side_factor_identity :
+    (31 : ℝ) / 32 * ((23 : ℝ) / 24) *
+        (∑ j ∈ Finset.range 16, ((2 : ℝ) / 3) ^ (j + 1)) =
+      ultraTemperedSixteenSideFactor := by
+  rw [sixteen_geometric_sum_identity]
+  norm_num [ultraTemperedSixteenSideFactor]
 
 /-- The new same-potential side factor clears `9/5`. -/
 theorem ultraTemperedSixteenSideFactor_gt_nine_fifths :
@@ -67,6 +86,7 @@ theorem ultraTemperedSixteenSideFactor_margin :
 
 #print axioms UltraTemperedSideExactBudget.exact_weight_power_certificate
 #print axioms UltraTemperedSideExactBudget.ultra_tempered_weight_ratio_gt_thirtyOne_over_thirtyTwo
+#print axioms UltraTemperedSideExactBudget.sixteen_geometric_sum_identity
 #print axioms UltraTemperedSideExactBudget.ultraTemperedSixteenSideFactor_gt_nine_fifths
 #print axioms UltraTemperedSideExactBudget.ultraTemperedFrontierThreshold_lt_five_ninths
 
