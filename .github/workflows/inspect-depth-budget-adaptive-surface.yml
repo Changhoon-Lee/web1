@@ -36,19 +36,23 @@ jobs:
           tar -xzf "$RUNNER_TEMP/tools.tar.gz" -C tools
           chmod +x tools/*.py tools/*.sh
           python3 tools/generate_k19_overlay_strict.py source | tee logs/overlay.out
+          find source/Erdos1135/KrasikovLagarias -maxdepth 1 -type f \
+            -name '*Adaptive*' -o -name '*Normalized*' | sort | tee logs/adaptive-files.txt
           {
             for f in \
               source/Erdos1135/KrasikovLagarias/AdaptiveCriticalChoice.lean \
               source/Erdos1135/KrasikovLagarias/AdaptiveCriticalSkeleton.lean \
-              source/Erdos1135/KrasikovLagarias/AdaptiveElimination.lean \
-              source/Erdos1135/KrasikovLagarias/AdaptiveEliminationTree.lean \
+              source/Erdos1135/KrasikovLagarias/AdaptiveNormalizedCoefficient.lean \
+              source/Erdos1135/KrasikovLagarias/AdaptiveEliminationAllowedFamily.lean \
               source/Erdos1135/KrasikovLagarias/AdaptiveEliminationPolicy.lean \
+              source/Erdos1135/KrasikovLagarias/AdaptiveEliminationTree.lean \
+              source/Erdos1135/KrasikovLagarias/EliminationCriticalSkeleton.lean \
               source/Erdos1135/KrasikovLagarias/EliminationCriticalTree.lean \
               source/Erdos1135/KrasikovLagarias/EliminationPolicy.lean \
               source/Erdos1135/KrasikovLagarias/EliminationSourceSystem.lean \
               source/Erdos1135/KrasikovLagarias/Retarded.lean; do
               echo "===== $f ====="
-              if test -f "$f"; then sed -n '1,1200p' "$f"; else echo MISSING; fi
+              if test -f "$f"; then sed -n '1,1400p' "$f"; else echo MISSING; fi
             done
           } | tee logs/adaptive-surface.txt
       - uses: actions/upload-artifact@v4
