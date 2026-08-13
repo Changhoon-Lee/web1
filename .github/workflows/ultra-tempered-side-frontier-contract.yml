@@ -57,6 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          mkdir -p .lake/build/lib/lean
           lake env lean UltraTemperedSideExactBudget.lean \
             -o .lake/build/lib/lean/UltraTemperedSideExactBudget.olean \
             -i .lake/build/lib/lean/UltraTemperedSideExactBudget.ilean \
