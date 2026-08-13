@@ -1,0 +1,41 @@
+name: K19 Exact Unweighted Bellman Frontier Certificate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/k19_unweighted_bellman_frontier_exact.cpp
+      - .github/workflows/k19-unweighted-bellman-frontier-exact.yml
+
+permissions:
+  contents: read
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run exact downward-rounded certificate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs
+          g++ -O3 -march=native -fopenmp -std=c++20 \
+            collatz_k19/k19_unweighted_bellman_frontier_exact.cpp \
+            -o "$RUNNER_TEMP/exact"
+          sha256sum \
+            collatz_k19/k19_unweighted_bellman_frontier_exact.cpp \
+            "$RUNNER_TEMP/exact" | tee logs/scanner.sha256
+          /usr/bin/time -v "$RUNNER_TEMP/exact" \
+            2>&1 | tee logs/exact-bellman-frontier.txt
+          grep -q '^ROWS=387420489$' logs/exact-bellman-frontier.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k19-exact-unweighted-bellman-frontier-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
