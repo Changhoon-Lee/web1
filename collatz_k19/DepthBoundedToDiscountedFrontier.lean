@@ -39,10 +39,9 @@ theorem discounted_sum_ge_uniform_floor
   rw [Finset.mul_sum]
   apply Finset.sum_le_sum
   intro x hx
-  rw [Finset.mem_filter] at hx
   exact mul_le_mul_of_nonneg_right
-    (pow_le_pow_of_le_exponent hq0 hq1 (hdepth x hx.1))
-    (hweight x hx.1)
+    (pow_le_pow_of_le_exponent hq0 hq1 (hdepth x hx))
+    (hweight x hx)
 
 /-- Consumer form: an unweighted lower bound at bounded depth immediately gives
 a discounted lower bound with the single explicit factor `q^bound`. -/
