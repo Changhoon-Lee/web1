@@ -24,7 +24,8 @@ static constexpr uint64_t C0=79781805157054ULL;
 static constexpr uint64_t C1=216678499581515ULL;
 static constexpr uint64_t C3=406990044804623ULL;
 static constexpr unsigned Q=256;
-static constexpr unsigned ITER_MAX=64;
+static constexpr unsigned ITER_MAX=512;
+static constexpr long double CORRECTED_THRESHOLD=28.0L/31.0L;
 
 struct Mapping{int fd=-1;size_t bytes=0;const unsigned char*data=nullptr;
  explicit Mapping(const char*p){fd=open(p,O_RDONLY);if(fd<0)throw std::runtime_error("open");struct stat st{};if(fstat(fd,&st))throw std::runtime_error("stat");bytes=size_t(st.st_size);data=(const unsigned char*)mmap(nullptr,bytes,PROT_READ,MAP_PRIVATE,fd,0);if(data==MAP_FAILED)throw std::runtime_error("mmap");}
@@ -45,18 +46,21 @@ int main(int argc,char**argv){if(argc!=2)return 2;Mapping w(argv[1]);if(w.bytes!
  std::vector<float> base(N),value(N),fresh(N);
 #pragma omp parallel for schedule(static)
  for(uint64_t i=0;i<N;++i){float u=(float)std::pow((long double)rd(w.data+4ULL*i),1.0L/Q);base[i]=u;value[i]=u;}
- std::cout<<std::setprecision(30)<<"ROWS="<<N<<"\nQ="<<Q<<"\n";
+ std::cout<<std::setprecision(30)<<"ROWS="<<N<<"\nQ="<<Q<<"\nCORRECTED_THRESHOLD="<<CORRECTED_THRESHOLD<<"\n";
  for(unsigned iter=1;iter<=ITER_MAX;++iter){
 #pragma omp parallel for schedule(static)
   for(uint64_t i=0;i<N;++i){long double v=c0*value[four_index(i)];unsigned k=i%3;if(k==0||k==2){uint32_t a=k==0?l1_aux(i):l3_aux(i);long double mn=std::min<long double>(value[a],std::min<long double>(value[a+AUX],value[a+2*AUX]));v+=(k==0?c1:c3)*mn;}fresh[i]=(float)v;}
-  uint64_t belowFiveNinths=0,belowSevenEighths=0,belowOne=0,changed=0;Minimum minimum;
+  uint64_t belowFiveNinths=0,belowSevenEighths=0,belowCorrected=0,belowOne=0,changed=0;Minimum minimum;
 #pragma omp parallel
-  {uint64_t b5=0,b7=0,b1=0,ch=0;Minimum local;
+  {uint64_t b5=0,b7=0,bc=0,b1=0,ch=0;Minimum local;
 #pragma omp for schedule(static)
-   for(uint64_t i=0;i<N;++i){long double r=(long double)fresh[i]/base[i];if(r<5.0L/9.0L)++b5;if(r<7.0L/8.0L)++b7;if(r<1.0L)++b1;if(fresh[i]>value[i])++ch;if(r<local.ratio)local={r,i};value[i]=std::max(value[i],fresh[i]);}
+   for(uint64_t i=0;i<N;++i){long double r=(long double)fresh[i]/base[i];if(r<5.0L/9.0L)++b5;if(r<7.0L/8.0L)++b7;if(r<CORRECTED_THRESHOLD)++bc;if(r<1.0L)++b1;if(fresh[i]>value[i])++ch;if(r<local.ratio)local={r,i};value[i]=std::max(value[i],fresh[i]);}
 #pragma omp critical
-   {belowFiveNinths+=b5;belowSevenEighths+=b7;belowOne+=b1;changed+=ch;if(local.ratio<minimum.ratio)minimum=local;}}
-  std::cout<<"ITER="<<iter<<" FRESH_MIN_RATIO="<<minimum.ratio<<" MIN_INDEX="<<minimum.index<<" BELOW_5_OVER_9="<<belowFiveNinths<<" BELOW_7_OVER_8="<<belowSevenEighths<<" BELOW_ONE="<<belowOne<<" VALUE_CHANGED="<<changed<<"\n";
-  if(changed==0)break;
+   {belowFiveNinths+=b5;belowSevenEighths+=b7;belowCorrected+=bc;belowOne+=b1;changed+=ch;if(local.ratio<minimum.ratio)minimum=local;}}
+  if(iter<=16||iter%16==0||belowCorrected==0||changed==0){
+    std::cout<<"ITER="<<iter<<" FRESH_MIN_RATIO="<<minimum.ratio<<" MIN_INDEX="<<minimum.index<<" BELOW_5_OVER_9="<<belowFiveNinths<<" BELOW_7_OVER_8="<<belowSevenEighths<<" BELOW_28_OVER_31="<<belowCorrected<<" BELOW_ONE="<<belowOne<<" VALUE_CHANGED="<<changed<<"\n";
+  }
+  if(belowCorrected==0){std::cout<<"CORRECTED_THRESHOLD_FIRST_PASS="<<iter<<"\n";break;}
+  if(changed==0){std::cout<<"BELLMAN_FIXED_POINT_BELOW_THRESHOLD="<<belowCorrected<<"\n";break;}
  }
  return 0;}
