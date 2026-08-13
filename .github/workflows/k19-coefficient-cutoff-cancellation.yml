@@ -1,5 +1,6 @@
 name: K19 Coefficient / Cutoff Cancellation Lean Gate
 
+# Re-run after the exact rpow/cancellation proof was normalized.
 on:
   workflow_dispatch:
   push:
