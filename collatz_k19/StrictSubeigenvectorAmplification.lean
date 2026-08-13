@@ -51,7 +51,7 @@ theorem iterate_lower_bound
         mul_le_mul_of_nonneg_left (hsubeigen i) hnonnegative
       have hhom := hhomogeneous
         (scale * (1 + delta) ^ n) hnonnegative w
-      rw [Function.iterate_succ_apply]
+      rw [Function.iterate_succ_apply']
       calc
         scale * (1 + delta) ^ (n + 1) * w i =
             (scale * (1 + delta) ^ n) * ((1 + delta) * w i) := by
