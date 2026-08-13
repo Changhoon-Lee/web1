@@ -1,0 +1,140 @@
+name: Maximum-Sharp Uniform First-Hit Depth Certificate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/DepthBoundedPredecessorV2.lean
+      - collatz_k19/DepthBoundedEnvelopeV2.lean
+      - collatz_k19/DepthBudgetRetarded.lean
+      - collatz_k19/DepthBudgetPath.lean
+      - collatz_k19/DepthBudgetRetardedChoice.lean
+      - collatz_k19/DepthBudgetAdaptiveBridge.lean
+      - collatz_k19/DepthBudgetTarget.lean
+      - collatz_k19/DepthBudgetUniformTarget.lean
+      - collatz_k19/DepthPhiUniformCertificate.lean
+      - collatz_k19/DepthBudgetMaxUniformTarget.lean
+      - .github/workflows/depth-budget-max-uniform-target.yml
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_URL: https://www.proofatlas.ai/sources/collatz-predecessor-090/commits/5f76a170e74ea5b0c37c56683bd4c1e9d72e5e3f/collatz_predecessor_090-1.0.0.tar.gz
+  SOURCE_ARCHIVE_SHA256: bc59cf3067a9377dbc0d4fc32d2eb4f228051f65cf2f41087a0066ef7ddedc9b
+
+jobs:
+  lean-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare pinned Lean project and depth overlays
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source logs
+          archive="$RUNNER_TEMP/source.tar.gz"
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o "$archive"
+          echo "$SOURCE_ARCHIVE_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C source --strip-components=1
+          for file in \
+            DepthBoundedPredecessorV2.lean \
+            DepthBoundedEnvelopeV2.lean \
+            DepthBudgetRetarded.lean \
+            DepthBudgetPath.lean \
+            DepthBudgetRetardedChoice.lean \
+            DepthBudgetAdaptiveBridge.lean \
+            DepthBudgetTarget.lean \
+            DepthBudgetUniformTarget.lean \
+            DepthPhiUniformCertificate.lean \
+            DepthBudgetMaxUniformTarget.lean; do
+            cp "collatz_k19/$file" "source/$file"
+          done
+          sha256sum collatz_k19/Depth*Uniform*.lean \
+            collatz_k19/DepthBudgetAdaptiveBridge.lean \
+            collatz_k19/DepthBudgetTarget.lean \
+            collatz_k19/DepthBoundedPredecessorV2.lean \
+            collatz_k19/DepthBoundedEnvelopeV2.lean \
+            collatz_k19/DepthBudgetRetarded.lean \
+            collatz_k19/DepthBudgetPath.lean \
+            collatz_k19/DepthBudgetRetardedChoice.lean \
+            | tee logs/source.sha256
+
+      - name: Install source-pinned Lean
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: source
+          auto-config: false
+          build: false
+          test: false
+          use-github-cache: false
+
+      - name: Fetch pinned dependencies
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake update
+          lake exe cache get
+
+      - name: Compile maximum-sharp actual certificate and audit axioms
+        working-directory: source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          for file in \
+            DepthBoundedPredecessorV2.lean \
+            DepthBoundedEnvelopeV2.lean \
+            DepthBudgetRetarded.lean \
+            DepthBudgetPath.lean \
+            DepthBudgetRetardedChoice.lean \
+            DepthBudgetAdaptiveBridge.lean \
+            DepthBudgetTarget.lean \
+            DepthBudgetUniformTarget.lean \
+            DepthPhiUniformCertificate.lean \
+            DepthBudgetMaxUniformTarget.lean; do
+            module=${file%.lean}
+            lake env lean "$file" \
+              -o ".lake/build/lib/lean/$module.olean" \
+              -i ".lake/build/lib/lean/$module.ilean" \
+              2>&1 | tee -a ../logs/lean.out
+          done
+          if grep -q 'sorryAx' ../logs/lean.out; then exit 5; fi
+          if grep -nE '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)' \
+              DepthBoundedPredecessorV2.lean \
+              DepthBoundedEnvelopeV2.lean \
+              DepthBudgetRetarded.lean \
+              DepthBudgetPath.lean \
+              DepthBudgetRetardedChoice.lean \
+              DepthBudgetAdaptiveBridge.lean \
+              DepthBudgetTarget.lean \
+              DepthBudgetUniformTarget.lean \
+              DepthPhiUniformCertificate.lean \
+              DepthBudgetMaxUniformTarget.lean; then
+            exit 6
+          fi
+          grep -q 'DepthBudgetMaxUniformTarget.maximum_uniform_actual_firstHit_lower_bound' ../logs/lean.out
+          printf '%s\n' \
+            'NUMERICAL_FIRST_HIT_RECURRENCE=PASS' \
+            'ADAPTIVE_TREE_TO_DEPTH_BUDGET=PASS' \
+            'EXACT_FINITE_MAXIMUM_BUDGET=PASS' \
+            'MAXIMUM_SHARP_ACTUAL_FIRST_HIT_CERTIFICATE=PASS' \
+            'NUMERICAL_MAXIMUM_VALUE=OPEN_FINITE_CERTIFICATE' \
+            'CUMULATIVE_TO_PREFIX_FREE_EXTRACTION=OPEN' \
+            'NO_SORRYAX=PASS' \
+            'FORMAL_GATE=PASS' \
+            | tee ../logs/verdict.out
+
+      - name: Upload Lean evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: depth-budget-max-uniform-target-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
