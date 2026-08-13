@@ -1,0 +1,73 @@
+name: K19 Maximum Depth-Budget Exact Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - collatz-k19-gate-clean-20260808
+    paths:
+      - collatz_k19/k19_maximum_depth_budget_stats.py
+      - .github/workflows/k19-maximum-depth-budget-stats.yml
+
+permissions:
+  contents: read
+
+env:
+  REPRODUCERS_SHA256: bb34a603feea4865a48ef26345b087f5f961ae7ace78c2acba254b071732a914
+  POTENTIAL_SHA256: 728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct authenticated K19 potential
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p logs reproducers
+          base64 --decode collatz_k19/k19_reproducers.tar.gz.b64 \
+            > "$RUNNER_TEMP/reproducers.tar.gz"
+          echo "$REPRODUCERS_SHA256  $RUNNER_TEMP/reproducers.tar.gz" \
+            | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/reproducers.tar.gz" -C reproducers
+          chmod +x reproducers/*.sh
+          WORK="$RUNNER_TEMP/k19_replay"
+          /usr/bin/time -v reproducers/reproduce_all.sh "$WORK" 4 \
+            2>&1 | tee logs/reconstruction.out
+          echo "$POTENTIAL_SHA256  $WORK/k19_adaptive_potential.u8" \
+            | sha256sum --check - | tee logs/potential-hash.out
+          echo "POTENTIAL_FILE=$WORK/k19_adaptive_potential.u8" >> "$GITHUB_ENV"
+
+      - name: Compute exact maximum budget and extraction loss
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x collatz_k19/k19_maximum_depth_budget_stats.py
+          sha256sum collatz_k19/k19_maximum_depth_budget_stats.py \
+            | tee logs/scanner.sha256
+          /usr/bin/time -v \
+            python3 collatz_k19/k19_maximum_depth_budget_stats.py \
+              "$POTENTIAL_FILE" \
+            2>&1 | tee logs/maximum-depth-budget.txt
+          grep -q '^EXACT_INTEGER_DEPTH_BUDGET_CERTIFICATE=PASS$' \
+            logs/maximum-depth-budget.txt
+          grep -q '^POTENTIAL_SHA256=728ed6fbe2def7f37e41b5568feefe3553a3d7c43553aee6ee5495f7ae241e39$' \
+            logs/maximum-depth-budget.txt
+          printf '%s\n' \
+            'AUTHENTICATED_POTENTIAL=PASS' \
+            'EXACT_MAXIMUM_DEPTH_BUDGET=PASS' \
+            'EXACT_DEPTH_PIGEONHOLE_AUDITED=PASS' \
+            | tee logs/verdict.out
+
+      - name: Upload exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k19-maximum-depth-budget-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
