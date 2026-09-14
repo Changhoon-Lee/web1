@@ -1,0 +1,35 @@
+name: LDIT APiCS frozen external holdout
+on:
+  push:
+    branches: [chatgpt-ldit-round2-frozen-20260914]
+    paths:
+      - '.github/workflows/ldit-apics-frozen-holdout.yml'
+  workflow_dispatch:
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install numpy pandas
+      - name: Restore frozen holdout script
+        run: base64 -d round2/apics_holdout.py.gz.b64 | gunzip > round2/apics_holdout.py
+      - name: Fetch untouched exact APiCS v2013
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/cldf-datasets/apics.git sources_apics
+          git -C sources_apics fetch --depth=1 origin 4ed59b5e5b6f6c666e9fa3c2e55e9e59863e70d9
+          git -C sources_apics checkout --detach 4ed59b5e5b6f6c666e9fa3c2e55e9e59863e70d9
+          test "$(git -C sources_apics rev-parse HEAD)" = "4ed59b5e5b6f6c666e9fa3c2e55e9e59863e70d9"
+      - name: Execute frozen holdout once
+        run: |
+          mkdir -p holdout_result
+          python round2/apics_holdout.py --apics sources_apics --out holdout_result | tee holdout_result/STDOUT.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-APiCS-v2013-frozen-holdout
+          path: holdout_result
+          retention-days: 90
