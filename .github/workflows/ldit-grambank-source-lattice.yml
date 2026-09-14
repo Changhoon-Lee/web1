@@ -1,0 +1,81 @@
+name: LDIT Grambank source-lattice identification
+on:
+  push:
+    branches: [chatgpt-ldit-round2-frozen-20260914]
+    paths:
+      - 'round2/grambank_round2_lattice.py.gz.b64'
+      - '.github/workflows/ldit-grambank-source-lattice.yml'
+  workflow_dispatch:
+jobs:
+  lattice:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install numpy pandas rapidfuzz
+      - name: Restore exact analysis script
+        run: base64 -d round2/grambank_round2_lattice.py.gz.b64 | gunzip > round2/grambank_round2_lattice.py
+      - name: Fetch exact frozen sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sources
+          clone_exact () { repo="$1"; commit="$2"; dest="$3"; git clone --filter=blob:none --no-checkout "https://github.com/${repo}.git" "$dest"; git -C "$dest" fetch --depth=1 origin "$commit"; git -C "$dest" checkout --detach "$commit"; test "$(git -C "$dest" rev-parse HEAD)" = "$commit"; }
+          clone_exact grambank/grambank 7ae000cf740f93cdb3e4ec67010668d6795337a9 sources/grambank
+          clone_exact cldf-datasets/phoible f36deac7f80b39483038af1a6134f27139e5417f sources/phoible
+          clone_exact lexibank/asjp 012795349540ba0dabfdcf2be16f2e77622f62d6 sources/asjp
+      - name: Run lattice shard
+        shell: bash
+        run: |
+          STARTS=(0 122 244 366 488 610 732 854)
+          ENDS=(122 244 366 488 610 732 854 973)
+          s=${STARTS[${{ matrix.shard }}]}; e=${ENDS[${{ matrix.shard }}]}
+          mkdir -p lattice
+          python round2/grambank_round2_lattice.py --grambank sources/grambank --phoible sources/phoible --asjp sources/asjp --out lattice --mode lattice --start "$s" --end "$e"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-source-lattice-${{ matrix.shard }}
+          path: lattice
+          retention-days: 30
+  combine:
+    needs: lattice
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: LDIT-source-lattice-*
+          path: shards
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install pandas
+      - name: Combine
+        shell: bash
+        run: |
+          python - <<'PY'
+          import glob,json,os,pandas as pd
+          fs=glob.glob('shards/**/triplet_source_lattice_summary_*.json',recursive=True); assert len(fs)==8,fs
+          countkeys=['eligible','identified_positive','identified_negative','identified_strict','ambiguous','any_strict_reversal','boundary_only','base_main_reverse','base_fine_reverse','base_refinement_reverse','main_fine_reverse','main_refinement_reverse','fine_refinement_reverse']
+          T={k:0 for k in countkeys}; ranges=[]
+          for f in fs:
+              d=json.load(open(f)); ranges.append((d['start'],d['end']))
+              for k in countkeys:T[k]+=int(d['total'][k])
+          ranges=sorted(ranges); assert ranges[0][0]==0 and ranges[-1][1]==973
+          for a,b in zip(ranges,ranges[1:]):assert a[1]==b[0]
+          e=T['eligible']
+          for k in ['identified_strict','ambiguous','any_strict_reversal','boundary_only','base_main_reverse','base_fine_reverse','base_refinement_reverse','main_fine_reverse','main_refinement_reverse','fine_refinement_reverse']:
+              T[k+'_rate']=T[k]/e
+          os.makedirs('combined',exist_ok=True); json.dump({'ranges':ranges,'total':T},open('combined/source_lattice_summary.json','w'),indent=2)
+          dfs=[pd.read_csv(f) for f in glob.glob('shards/**/triplet_source_lattice_per_anchor_*.csv',recursive=True)]; df=pd.concat(dfs,ignore_index=True).sort_values('anchor_id'); assert len(df)==973; df.to_csv('combined/source_lattice_per_anchor.csv',index=False)
+          print(json.dumps(T,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-source-lattice-combined
+          path: combined
+          retention-days: 30
