@@ -1,0 +1,64 @@
+name: LDIT public downstream consequence audit
+on:
+  push:
+    branches: [chatgpt-ldit-round2-frozen-20260914]
+    paths:
+      - '.github/workflows/ldit-langrank-public-data-audit.yml'
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch LangRank public indexed data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public_audit/raw public_audit/out
+          python - <<'PY'
+          import urllib.request
+          urls=['https://phontron.com/data/langrank/indexed.tar.gz','http://phontron.com/data/langrank/indexed.tar.gz']
+          last=None
+          for u in urls:
+              try:
+                  urllib.request.urlretrieve(u,'public_audit/raw/indexed.tar.gz')
+                  print('downloaded',u)
+                  break
+              except Exception as e:
+                  print('failed',u,repr(e)); last=e
+          else: raise last
+          PY
+          tar -xzf public_audit/raw/indexed.tar.gz -C public_audit/raw
+          find public_audit/raw -maxdepth 4 -type f -printf '%P\t%s\n' | sort > public_audit/out/file_inventory.tsv
+          sha256sum public_audit/raw/indexed.tar.gz > public_audit/out/archive_sha256.txt
+      - name: Audit schemas and score-like columns
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os,glob,csv,json,re
+          root='public_audit/raw'
+          rows=[]
+          for f in glob.glob(root+'/**/*',recursive=True):
+              if not os.path.isfile(f) or f.endswith('.tar.gz'): continue
+              rel=os.path.relpath(f,root)
+              rec={'path':rel,'bytes':os.path.getsize(f),'header':None,'score_columns':[],'n_lines':None}
+              try:
+                  with open(f,encoding='utf-8',errors='replace') as h:
+                      first=h.readline().rstrip('\n\r'); rec['header']=first[:1000]
+                      rec['score_columns']=[x for x in re.split(r'[\t,]',first) if re.search(r'score|acc|las|uas|bleu|f1|perf|rank|target|transfer',x,re.I)]
+                      rec['n_lines']=1+sum(1 for _ in h)
+              except Exception as e: rec['error']=repr(e)
+              rows.append(rec)
+          json.dump(rows,open('public_audit/out/schema_audit.json','w'),indent=2)
+          # Save small text heads only, no transformations.
+          with open('public_audit/out/heads.txt','w') as out:
+              for r in rows:
+                  out.write('\n### '+r['path']+'\n'+str(r.get('header',''))+'\n')
+          print(json.dumps(rows[:20],indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-LangRank-public-data-audit
+          path: public_audit/out
+          retention-days: 90
