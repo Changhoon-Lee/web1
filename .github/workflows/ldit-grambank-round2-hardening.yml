@@ -1,0 +1,112 @@
+name: LDIT Grambank Round2 hardening
+on:
+  push:
+    branches: [chatgpt-ldit-round2-frozen-20260914]
+    paths:
+      - 'round2/grambank_round2_hardening.py'
+      - '.github/workflows/ldit-grambank-round2-hardening.yml'
+  workflow_dispatch:
+jobs:
+  nn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install numpy pandas rapidfuzz
+      - name: Restore frozen analysis script
+        run: base64 -d round2/grambank_round2_hardening.py.gz.b64 | gunzip > round2/grambank_round2_hardening.py
+      - name: Fetch exact frozen sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sources
+          clone_exact () { repo="$1"; commit="$2"; dest="$3"; git clone --filter=blob:none --no-checkout "https://github.com/${repo}.git" "$dest"; git -C "$dest" fetch --depth=1 origin "$commit"; git -C "$dest" checkout --detach "$commit"; test "$(git -C "$dest" rev-parse HEAD)" = "$commit"; }
+          clone_exact grambank/grambank 7ae000cf740f93cdb3e4ec67010668d6795337a9 sources/grambank
+          clone_exact cldf-datasets/phoible f36deac7f80b39483038af1a6134f27139e5417f sources/phoible
+          clone_exact lexibank/asjp 012795349540ba0dabfdcf2be16f2e77622f62d6 sources/asjp
+      - name: Run NN and margin hardening
+        run: |
+          mkdir -p results_nn
+          python round2/grambank_round2_hardening.py --grambank sources/grambank --phoible sources/phoible --asjp sources/asjp --out results_nn --mode nn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-grambank-round2-nn
+          path: results_nn
+          retention-days: 30
+  triplet:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install numpy pandas rapidfuzz
+      - name: Restore frozen analysis script
+        run: base64 -d round2/grambank_round2_hardening.py.gz.b64 | gunzip > round2/grambank_round2_hardening.py
+      - name: Fetch exact frozen sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sources
+          clone_exact () { repo="$1"; commit="$2"; dest="$3"; git clone --filter=blob:none --no-checkout "https://github.com/${repo}.git" "$dest"; git -C "$dest" fetch --depth=1 origin "$commit"; git -C "$dest" checkout --detach "$commit"; test "$(git -C "$dest" rev-parse HEAD)" = "$commit"; }
+          clone_exact grambank/grambank 7ae000cf740f93cdb3e4ec67010668d6795337a9 sources/grambank
+          clone_exact cldf-datasets/phoible f36deac7f80b39483038af1a6134f27139e5417f sources/phoible
+          clone_exact lexibank/asjp 012795349540ba0dabfdcf2be16f2e77622f62d6 sources/asjp
+      - name: Run triplet shard
+        shell: bash
+        run: |
+          STARTS=(0 122 244 366 488 610 732 854)
+          ENDS=(122 244 366 488 610 732 854 973)
+          s=${STARTS[${{ matrix.shard }}]}; e=${ENDS[${{ matrix.shard }}]}
+          mkdir -p results_triplet
+          python round2/grambank_round2_hardening.py --grambank sources/grambank --phoible sources/phoible --asjp sources/asjp --out results_triplet --mode triplet --start "$s" --end "$e"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-grambank-round2-triplet-${{ matrix.shard }}
+          path: results_triplet
+          retention-days: 30
+  combine:
+    needs: triplet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: LDIT-grambank-round2-triplet-*
+          path: shards
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install pandas
+      - name: Combine exact counts
+        shell: bash
+        run: |
+          python - <<'PY'
+          import glob,json,os,pandas as pd
+          files=glob.glob('shards/**/triplet_source_defined_summary_*.json',recursive=True)
+          assert len(files)==8, files
+          names=['main','fine','refinement']; keys=['eligible','base_strict','alt_strict','same_strict','reverse','base_strict_to_tie','base_tie_to_strict','both_tie','grammar_reverse']
+          tot={n:{k:0 for k in keys} for n in names}; ranges=[]
+          for f in files:
+              d=json.load(open(f)); ranges.append((d['start'],d['end']))
+              for n in names:
+                  for k in keys: tot[n][k]+=int(d['totals'][n][k])
+          ranges=sorted(ranges); assert ranges[0][0]==0 and ranges[-1][1]==973
+          for a,b in zip(ranges,ranges[1:]): assert a[1]==b[0]
+          for n in names:
+              e=tot[n]['eligible']; tot[n]['reverse_rate']=tot[n]['reverse']/e; tot[n]['grammar_reverse_rate']=tot[n]['grammar_reverse']/e
+          os.makedirs('combined',exist_ok=True)
+          json.dump({'ranges':ranges,'totals':tot},open('combined/triplet_source_defined_summary.json','w'),indent=2)
+          fs=glob.glob('shards/**/triplet_source_defined_per_anchor_*.csv',recursive=True); df=pd.concat([pd.read_csv(f) for f in fs],ignore_index=True).sort_values('anchor_id'); assert len(df)==973
+          df.to_csv('combined/triplet_source_defined_per_anchor.csv',index=False)
+          print(json.dumps(tot,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-grambank-round2-triplet-combined
+          path: combined
+          retention-days: 30
