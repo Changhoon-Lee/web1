@@ -1,0 +1,35 @@
+name: LDIT eWAVE frozen secondary replication
+on:
+  push:
+    branches: [chatgpt-ldit-round2-frozen-20260914]
+    paths:
+      - '.github/workflows/ldit-ewave-secondary.yml'
+  workflow_dispatch:
+jobs:
+  ewave:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install numpy pandas
+      - name: Restore frozen analysis script
+        run: base64 -d round2/ewave_secondary.py.gz.b64 | gunzip > round2/ewave_secondary.py
+      - name: Fetch exact untouched eWAVE v3.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/cldf-datasets/ewave.git ewave_src
+          git -C ewave_src fetch --depth=1 origin 6f74fdd4abc7214e26c2de577086f689becf3f58
+          git -C ewave_src checkout --detach 6f74fdd4abc7214e26c2de577086f689becf3f58
+          test "$(git -C ewave_src rev-parse HEAD)" = "6f74fdd4abc7214e26c2de577086f689becf3f58"
+      - name: Execute frozen secondary replication once
+        run: |
+          mkdir -p result
+          python round2/ewave_secondary.py --ewave ewave_src --out result | tee result/STDOUT.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-eWAVE-v3.0-frozen-secondary
+          path: result
+          retention-days: 90
