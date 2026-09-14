@@ -1,0 +1,58 @@
+name: LDIT export exact sources
+
+on:
+  push:
+    branches: [chatgpt-ldit-hardening-20260914]
+    paths: ['.github/workflows/ldit-export-exact-sources.yml']
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact source commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p exact_sources
+          clone_exact () {
+            repo="$1"; commit="$2"; dest="$3"
+            git clone --filter=blob:none --no-checkout "https://github.com/${repo}.git" "$dest"
+            git -C "$dest" fetch --depth=1 origin "$commit"
+            git -C "$dest" checkout --detach "$commit"
+            test "$(git -C "$dest" rev-parse HEAD)" = "$commit"
+          }
+          clone_exact cldf-datasets/wals f97440d6edbaed0097d1bd307a5a20ea3f09e271 exact_sources/wals
+          clone_exact grambank/grambank 7ae000cf740f93cdb3e4ec67010668d6795337a9 exact_sources/grambank
+          clone_exact cldf-datasets/phoible f36deac7f80b39483038af1a6134f27139e5417f exact_sources/phoible
+          clone_exact lexibank/asjp 012795349540ba0dabfdcf2be16f2e77622f62d6 exact_sources/asjp
+          clone_exact glottolog/glottolog-cldf 072ca0d0410039fb8b779be8fc165bac575d2cda exact_sources/glottolog
+          printf '%s\n' \
+            'WALS=f97440d6edbaed0097d1bd307a5a20ea3f09e271' \
+            'Grambank=7ae000cf740f93cdb3e4ec67010668d6795337a9' \
+            'PHOIBLE=f36deac7f80b39483038af1a6134f27139e5417f' \
+            'ASJP=012795349540ba0dabfdcf2be16f2e77622f62d6' \
+            'Glottolog=072ca0d0410039fb8b779be8fc165bac575d2cda' > exact_sources/SOURCE_COMMITS.txt
+      - name: Keep only analysis inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          find exact_sources/wals -mindepth 1 -maxdepth 1 ! -name cldf -exec rm -rf {} +
+          find exact_sources/phoible -mindepth 1 -maxdepth 1 ! -name cldf -exec rm -rf {} +
+          find exact_sources/asjp -mindepth 1 -maxdepth 1 ! -name cldf -exec rm -rf {} +
+          find exact_sources/glottolog -mindepth 1 -maxdepth 1 ! -name cldf -exec rm -rf {} +
+          mkdir -p exact_sources/grambank_docs
+          cp exact_sources/grambank/docs/feature_groupings/feature_grouping_for_analysis.csv exact_sources/grambank_docs/
+          find exact_sources/grambank -mindepth 1 -maxdepth 1 ! -name cldf -exec rm -rf {} +
+          cp exact_sources/grambank_docs/feature_grouping_for_analysis.csv exact_sources/grambank/
+          rm -rf exact_sources/grambank_docs
+          du -sh exact_sources/*
+      - name: Upload exact source tables
+        uses: actions/upload-artifact@v4
+        with:
+          name: LDIT-exact-source-tables-hardening
+          path: exact_sources
+          retention-days: 7
+          compression-level: 6
